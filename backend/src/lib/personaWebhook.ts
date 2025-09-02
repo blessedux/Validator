@@ -34,15 +34,15 @@ export const handlePersonaWebhook = async (req, res) => {
     const event = req.body;
 
     const verificationStatus = event.data?.attributes?.payload?.data?.attributes?.status;
-    const referenceId = event.data?.attributes?.payload?.data?.attributes?.reference_id;
+    const referenceId = event.data?.attributes?.payload?.data?.attributes?.['reference-id'];
     lastPersonaVerification = {
       webHookReceived: event,
       status: verificationStatus,
       referenceId: referenceId
     };
 
-    console.log('Received Persona webhook event:', event.data?.attributes?.payload?.data?.attributes?.status);
-
+    console.log('Received Persona webhook event:', verificationStatus);
+    console.log('Reference ID:', referenceId);
     res.status(200).json({ received: true });
   } catch (error) {
     console.error('Webhook processing error:', error);
