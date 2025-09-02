@@ -476,9 +476,31 @@ app.post('/persona/inquiry', async (req, res) => {
 
 // Receive Persona webhooks and store the latest verification
 
-// -- Potentialy to remove -- 
-// app.post('/webhook/persona/', express.raw({ type: 'application/json' }), handlePersonaWebhook);
-// -- Potentialy to remove -- 
+
+app.post('/webhook/persona/', express.raw({ type: 'application/json' }), handlePersonaWebhook);
+
+app.get('/webhook/persona/:referenceId', (req, res) => {
+  try {
+    const { referenceId } = req.params;
+
+    const webhooksArray = Array.isArray(lastPersonaVerification)
+      ? lastPersonaVerification
+      : (lastPersonaVerification ? [lastPersonaVerification] : []);
+    const filteredWebhooks = webhooksArray.filter(webhook =>
+      webhook.referenceId === referenceId && webhook.status === "completed"
+    );
+    if (filteredWebhooks.length === 0) {
+      return res.status(404).json({ error: 'No completed webhooks found for this referenceId', referenceId });
+    }
+
+    return res.status(200).json({
+      success: true,
+    });
+  } catch (error) {
+    console.error('Error filtering webhooks by status:', error);
+    return res.status(500).json({ error: 'Failed to filter webhooks' });
+  }
+});
 
 // Persona get inquiry by ID, return data and update status in DB
 app.get('/persona/inquiry/:referenceID', async (req, res) => {
@@ -516,7 +538,7 @@ app.get('/persona/inquiry/:referenceID', async (req, res) => {
       });
     }
 
-    const dataArray = Array.isArray(result?.data) ? result.data : [];
+    const dataArray = Array.isArray((result as any)?.data) ? (result as any).data : [];
     if (dataArray.length === 0) {
       return res.status(404).json({ error: 'No inquiries found for referenceID', referenceID });
     }
