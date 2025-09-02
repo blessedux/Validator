@@ -1,0 +1,6 @@
+packages:
+  - "frontend"
+  - "backoffice"
+  - "backend"
+  - "shared"
+  - "db-admin"

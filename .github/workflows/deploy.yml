@@ -1,0 +1,39 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - prod # o la rama que quieras
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: Production
+    steps:
+      - name: Trigger deploy via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/DOBVALIDATOR
+            echo "🔍 Checking environment..."
+            node --version
+            npm --version
+            echo "📦 Installing pnpm if not available..."
+            npm install -g pnpm
+            echo "📦 Installing dependencies..."
+            pnpm install --frozen-lockfile
+            echo "🔍 Checking if dependencies are installed..."
+            ls -la node_modules/.pnpm/ | grep -E "(pdfkit|nodemailer)" || echo "⚠️  Dependencies not found in node_modules"
+            echo "🔨 Building backend..."
+            cd backend
+            pnpm install --frozen-lockfile
+            pnpm run build
+            cd ..
+            echo "🔨 Building frontend..."
+            pnpm --filter @dob-validator/frontend run build
+            echo "🔨 Building backoffice..."
+            pnpm --filter @dob-validator/backoffice run build
+            echo "✅ All builds completed successfully!"
