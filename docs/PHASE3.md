@@ -1,4 +1,3 @@
----
 
 ## **DAYS 1-2: Smart Contract Function Implementation**
 
