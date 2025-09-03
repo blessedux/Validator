@@ -10,10 +10,10 @@
 
 ### **Day 2: Admin Functions & Queries**
 
-- [ ] Implement `set_project_approved()` and `set_project_rejected()`
-- [ ] Add `get_project_status()` and `get_all_projects_statuses()`
-- [ ] Test admin functions and status queries
-- [ ] **DELIVERABLE**: Admin functions operational
+- [x] Implement `set_project_approved()` and `set_project_rejected()`
+- [x] Add `get_project_status()` and `get_all_projects_statuses()`
+- [x] Test admin functions and status queries
+- [x] **DELIVERABLE**: Admin functions operational
 
 ---
 
