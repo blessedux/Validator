@@ -280,21 +280,10 @@ export function SubmissionReview({
         submission.id,
         isApproved ? "APPROVED" : "REJECTED",
       );
-
-      // Create or update admin review (temporarily disabled due to backend issues)
-      console.log(
-        "📝 Admin review data (not saved to backend due to 500 error):",
-        {
-          submission_id: submission.id,
-          notes: reviewerNotes,
-          technical_score: trufaScores.technical[0],
-          regulatory_score: trufaScores.regulatory[0],
-          financial_score: trufaScores.financial[0],
-          environmental_score: 85, // Default environmental score
-          overall_score: averageScore,
-          decision: isApproved ? "APPROVED" : "REJECTED",
-        },
-      );
+ 
+      if (!updateResponse || !updateResponse.success) {
+        throw new Error("Failed to update submission status in database");
+      }
 
       // Create TRUFA metadata using production-ready service
       const metadata = stellarContractService.createTrufaMetadata({
@@ -307,12 +296,12 @@ export function SubmissionReview({
           technical: trufaScores.technical[0],
           regulatory: trufaScores.regulatory[0],
           financial: trufaScores.financial[0],
-          environmental: 85, // Default environmental score
+          environmental: 85, 
           overall: averageScore,
         },
         decision: isApproved ? "APPROVED" : "REJECTED",
       });
-      console.log("📋 Created TRUFA metadata:", metadata);
+      console.log("Created TRUFA metadata:", metadata);
 
       // Defensive: check all required metadata fields
       if (
@@ -403,6 +392,7 @@ export function SubmissionReview({
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
+      console.log("Error during submission:", error);
     } finally {
       setIsSubmitting(false);
     }
