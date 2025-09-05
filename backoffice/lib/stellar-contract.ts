@@ -44,7 +44,7 @@ class StellarContractService {
       const account = await server.getAccount(adminPublic);
 
       const transaction = new TransactionBuilder(account, {
-        fee: "1",
+        fee: "10000",
         networkPassphrase: Networks.TESTNET,
       })
         .addOperation(
