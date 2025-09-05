@@ -339,6 +339,26 @@ class ApiService {
     })
   }
 
+  async generateCertificate(
+    submissionId: string,
+    stellarTxHash?: string,
+    metadata?: Record<string, any>
+  ): Promise<{ success: boolean; certificate?: Certificate; message?: string }> {
+    if (!submissionId) {
+      throw new Error('submissionId is required')
+    }
+
+    const endpoint = `/certificate/generate/${submissionId}/${stellarTxHash || ''}`
+
+    const body: any = { submissionId }
+    if (stellarTxHash) body.stellarTxHash = stellarTxHash
+    if (metadata) body.metadata = metadata 
+    return this.request<{ success: boolean; certificate?: Certificate; message?: string }>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  }
+
   // Add missing methods for backward compatibility
   isAuthenticated(): boolean {
     // Check if we have an auth token
