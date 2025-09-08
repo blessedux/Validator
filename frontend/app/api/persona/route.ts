@@ -23,14 +23,14 @@ export async function POST(request: NextRequest) {
     
     // Get the backend URL safely
     const backendUrl = getSafeBackendUrl()
-    const backendResponse = await fetch(`https://localhost:4000/webhook/persona`, {
-      method: 'GET',
+    console.log('🔍 [getSafeBackendUrl] Using backendUrl:', backendUrl)
+    
+    const backendResponse = await fetch(`${backendUrl}/webhook/persona`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        body
-      })
+      body: JSON.stringify(body)
     })
     
     if (!backendResponse.ok) {
@@ -44,6 +44,8 @@ export async function POST(request: NextRequest) {
     
     const backendData = await backendResponse.json()
     console.log('Backend personas received:', backendData)
+    
+    return NextResponse.json({ success: true, data: backendData })
     
   } catch (error) {
     console.error('Error pesonas request:', error)
