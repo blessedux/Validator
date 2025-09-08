@@ -54,7 +54,6 @@ export function DeviceBasicInfo({
   const [isSaving, setIsSaving] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<number | null>(null);
-  const verificationWindowRef = useRef<Window | null>(null);
   const [localWalletAddress, setWalletAddress] = useState<any | null>(null);
   const { toast } = useToast();
 
@@ -73,31 +72,9 @@ export function DeviceBasicInfo({
     };
   }, [showWelcomeModal]);
 
-
-  // WEBHOOK HANDLER --
-  // GET WEBHOOK PERSONA RESPONSE
-  async function handlePersonaWebhook(localWalletAddress: string) {
-    try {
-      const res = await fetch(`${backendSafeUrl}/webhook/persona/${encodeURIComponent(localWalletAddress)}`, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      });
-      if (!res.ok) {
-        if (res.status === 404) {
-          console.warn('No inquiry found for referenceId:', localWalletAddress);
-          return null;
-        }
-        throw new Error(`Request failed: ${res.status}`);
-      }
-      return await res.json();
-    } catch (err) {
-      console.error('Error handling Persona webhook:', err);
-    }
-  }
-
-
   // REPLACE WITH REAL BACKEND SAFE URL FUNCTION !!
   const backendSafeUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
+
   // CREATE INQUIRY --
   // get wallet address from localStorage
   useEffect(() => {
@@ -113,7 +90,7 @@ export function DeviceBasicInfo({
       console.error('Error reading walletAddress from storage', e);
     }
   }, []);
-  // search inquiry by referenceId (wallet address) --
+  // search inquiry by referenceId (wallet address)
   async function searchPersonaInquiry(localWalletAddress: string) {
     try {
       const res = await fetch(`${backendSafeUrl}/persona/inquiry/${encodeURIComponent(localWalletAddress)}`, {
@@ -161,7 +138,7 @@ export function DeviceBasicInfo({
         throw new Error('Inquiry ID missing in response');
       }
 
-      // CREATE ONE-TIME-LINK --
+      // CREATE ONE-TIME-LINK
       const linkRes = await fetch(
         `${backendSafeUrl}/persona/inquiry/${encodeURIComponent(inquiryId)}/generate-one-time-link`,
         {
@@ -217,29 +194,23 @@ export function DeviceBasicInfo({
       return console.error('Failed to create Persona inquiry or one-time link')
     }
 
-    const personaWindow = window.open(oneTimeLink, "_blank");
-    verificationWindowRef.current = personaWindow;
+    window.open(`${oneTimeLink}`, '_blank', 'noopener,noreferrer')
     setPersonaVerification(true)
 
     console.log('STARTING PERSONA VERIFICATION FLOW ON:', oneTimeLink)
     console.log('WAITING FOR PERSONA VERIFICATION TO COMPLETE...')
 
     pollRef.current = window.setInterval(async () => {
-      try {
-        const webhookResponse = await handlePersonaWebhook(localWalletAddress);
-        if (webhookResponse?.success) {
-          verificationWindowRef.current?.close();
-          verificationWindowRef.current = null;
-          clearInterval(pollRef.current!);
-          pollRef.current = null;
-          setPersonaVerification(true);
-        } else {
-          console.log('Persona verification not completed yet.');
+      const personaInquiry = await searchPersonaInquiry(localWalletAddress)
+      if (personaInquiry?.status === 'completed') {
+        console.log('Persona inquiry data:', personaInquiry)
+        setPersonaVerification(true)
+        if (pollRef.current) {
+          clearInterval(pollRef.current)
+          pollRef.current = null
         }
-      } catch (error) {
-        console.error('Error polling Persona webhook:', error);
       }
-    }, 5000);
+    }, 5000)
   }, [localWalletAddress, personaVerification])
 
   useEffect(() => {
