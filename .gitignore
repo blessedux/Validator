@@ -99,6 +99,10 @@ auth.json
 !.env.example
 !.env.template
 
+®# Backend environment files with sensitive keys
+backend/env.development
+backend/env.production
+
 # Local development files
 *.local
 local.*

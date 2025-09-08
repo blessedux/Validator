@@ -57,6 +57,12 @@ export function EnhancedDeviceVerificationFlow() {
   const [currentStep, setCurrentStep] = useState(1);
   const [verificationDone, setVerificationDone] = useState(false);
 
+  // Persona KYC integration states
+  const [personaVerification, setPersonaVerification] = useState(false);
+  const [localWalletAddress, setLocalWalletAddress] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [personaWindow, setPersonaWindow] = useState<Window | null>(null);
+
   const [deviceData, setDeviceData] = useState<DeviceData>({
     deviceName: "",
     deviceType: "",
@@ -97,14 +103,194 @@ export function EnhancedDeviceVerificationFlow() {
 
   const totalSteps = 4;
 
-  // Initialize verification state
+  // Persona KYC integration functions
+  const getSafeBackendUrl = () => {
+    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  };
+
+  const searchPersonaInquiry = async (referenceID: string) => {
+    try {
+      const backendUrl = getSafeBackendUrl();
+      const res = await fetch(`${backendUrl}/persona/status/${encodeURIComponent(referenceID)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('No inquiry found for referenceId:', referenceID);
+          return null;
+        }
+        throw new Error(`Request failed: ${res.status}`);
+      }
+      
+      const data = await res.json();
+      console.log('🔍 Persona status response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error searching Persona inquiry:', error);
+      return null;
+    }
+  };
+
+  const createPersonaInquiry = async () => {
+    try {
+      const backendUrl = getSafeBackendUrl();
+      const payload = { localWalletAddress };
+
+      const res = await fetch(`${backendUrl}/persona/inquiry`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log('🔍 Inquiry created:', data);
+
+      const inquiryId = data?.result?.data?.id;
+      if (!inquiryId) {
+        throw new Error('Inquiry ID missing in response');
+      }
+
+      // CREATE ONE-TIME-LINK
+      const linkRes = await fetch(
+        `${backendUrl}/persona/inquiry/${encodeURIComponent(inquiryId)}/generate-one-time-link`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!linkRes.ok) {
+        throw new Error(`Failed to generate one-time link: ${linkRes.status}`);
+      }
+
+      const linkData = await linkRes.json();
+      console.log('🔍 One-time link:', linkData);
+      return linkData.link || linkData.data?.attributes?.href || null;
+
+    } catch (error) {
+      console.error('ERROR CREATING INQUIRY OR LINK', error);
+      return null;
+    }
+  };
+
+  const handlePersonaVerification = useCallback(async () => {
+    if (personaVerification || isVerifying) {
+      return;
+    }
+
+    if (!localWalletAddress) {
+      console.error('Wallet address is required to create Persona inquiry');
+      return;
+    }
+
+    setIsVerifying(true);
+    console.log('🔍 Starting Persona verification for wallet:', localWalletAddress);
+
+    try {
+      const oneTimeLink = await createPersonaInquiry();
+      if (!oneTimeLink) {
+        console.error('Failed to create Persona inquiry or one-time link');
+        setIsVerifying(false);
+        return;
+      }
+
+      // Open Persona flow in new tab
+      const newWindow = window.open(oneTimeLink, '_blank', 'noopener,noreferrer');
+      setPersonaWindow(newWindow);
+      
+      console.log('🔍 Persona verification opened in new tab:', oneTimeLink);
+
+      // Start polling for completion
+      const pollInterval = setInterval(async () => {
+        const status = await searchPersonaInquiry(localWalletAddress);
+        console.log('🔍 Polling Persona status:', status?.status, 'for wallet:', localWalletAddress);
+        
+        if (status?.status === 'completed' || status?.status === 'approved') {
+          console.log('✅ Persona verification completed!');
+          setPersonaVerification(true);
+          setVerificationDone(true);
+          clearInterval(pollInterval);
+          
+          // Close the Persona tab
+          if (newWindow) {
+            newWindow.close();
+          }
+          
+          // Redirect to form
+          router.push('/form');
+        } else if (status?.status === 'created' || status?.status === 'pending') {
+          // Continue polling
+          console.log('⏳ Persona verification in progress...');
+        } else {
+          // Unknown status, continue polling
+          console.log('❓ Unknown Persona status:', status?.status);
+        }
+      }, 2000); // Poll every 2 seconds
+
+      // Cleanup polling after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setIsVerifying(false);
+      }, 300000);
+
+    } catch (error) {
+      console.error('Error in Persona verification:', error);
+      setIsVerifying(false);
+    }
+  }, [localWalletAddress, personaVerification, isVerifying, router]);
+
+  // Initialize verification state and check Persona status
   useEffect(() => {
     setVerificationDone(false);
-  }, []);
+    
+    // Get wallet address from localStorage
+    const wallet = localStorage.getItem('walletAddress') || localStorage.getItem('stellarPublicKey');
+    if (wallet) {
+      let addr = wallet;
+      try { 
+        addr = JSON.parse(wallet); 
+      } catch { 
+        // Keep original value if parsing fails
+      }
+      setLocalWalletAddress(addr as string);
+      console.log('🔍 Wallet address loaded:', addr);
+      
+      // Check if Persona verification is already completed
+      searchPersonaInquiry(addr as string).then((status) => {
+        if (status?.status === 'completed' || status?.status === 'approved') {
+          console.log('✅ Persona verification already completed, redirecting to form');
+          setPersonaVerification(true);
+          setVerificationDone(true);
+          router.push('/form');
+        }
+      });
+    }
+  }, [router]);
+
+  // Cleanup Persona window on unmount
+  useEffect(() => {
+    return () => {
+      if (personaWindow) {
+        personaWindow.close();
+      }
+    };
+  }, [personaWindow]);
 
   // Check for edit mode and load draft if needed
   useEffect(() => {
-    const editId = searchParams.get("edit");
+    const editId = searchParams?.get("edit");
     console.log("🔍 Checking for edit mode, editId:", editId);
     if (editId) {
       console.log("🔍 Edit mode detected, loading draft:", editId);
@@ -1071,68 +1257,100 @@ export function EnhancedDeviceVerificationFlow() {
       {/* Identity Verification Modal - Show directly when component loads */}
       {!verificationDone && (
         <div
-          className="flex flex-col items-center justify-center min-h-screen w-full text-card-foreground transition-all duration-500 opacity-100 scale-100"
+          className="fixed top-0 left-0 h-screen w-full flex flex-col items-center justify-center text-card-foreground transition-all duration-500 opacity-100 scale-100"
+          style={{ margin: 0, padding: 0 }}
         >
-          <img
-            src="/images/dob imagotipo.svg"
-            alt="DOB Imagotipo"
-            className="w-80 h-80 mb-2"
-          />
-          <div className="bg-primary w-full max-w-md rounded-lg text-primary-foreground text-lg font-bold text-center px-4 py-2 mb-2">
-            Identity Verification
-          </div>
-          <div className="text-muted-foreground text-sm text-center px-4 mb-4 max-w-md">
-            Please complete identity verification to access your account. You'll
-            need:
-          </div>
-          <ul className="w-full max-w-md px-4 mb-6 space-y-2">
-            <li className="flex items-center text-primary text-base">
-              <span className="mr-2">✔️</span>A valid government-issued ID
-            </li>
-            <li className="flex items-center text-primary text-base">
-              <span className="mr-2">✔️</span>A device with a camera for selfie
-              verification
-            </li>
-          </ul>
-          <div className="flex flex-col gap-4 w-full max-w-md px-4 mb-6">
-            <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 w-full py-4 text-base font-semibold rounded-lg"
-              style={{ minWidth: 0 }}
-              onClick={() => {
-                setVerificationDone(true);
-              }}
-            >
-              Start Verification
-            </Button>
-            <Button
-              className="bg-muted text-primary w-full py-4 text-base font-semibold border border-primary rounded-lg"
-              style={{ minWidth: 0 }}
-              variant="outline"
-            >
-              Check my Status
-            </Button>
-            <button
-              className="text-muted-foreground text-sm font-medium hover:text-primary transition-colors duration-200 mt-2"
-              onClick={() => {
-                // Go back to previous page or close modal
-                router.back();
-              }}
-            >
-              Go Back
-            </button>
-          </div>
-          <div className="w-full max-w-md px-4">
-            <div className="border-t border-border mb-3"></div>
-            <div className="text-muted-foreground text-sm mb-2 text-center">
-              Having trouble?
+          <div className="space-y-4">
+            <img
+              src="/images/dob imagotipo.svg"
+              alt="DOB Imagotipo"
+              className="w-48 h-48 mx-auto"
+            />
+            <div className="bg-primary w-full max-w-md rounded-lg text-primary-foreground text-lg font-bold text-center px-4 py-2">
+              Identity Verification
             </div>
-            <div className="text-center">
-              <a
-                href="#"
-                className="text-primary underline text-sm font-medium"
+            <div className="text-muted-foreground text-sm text-center px-4 max-w-md">
+              Please complete identity verification to access your account. You'll
+              need:
+            </div>
+            <ul className="w-full max-w-md px-4 space-y-2">
+              <li className="flex items-center text-primary text-base">
+                <span className="mr-2">✔️</span>A valid government-issued ID
+              </li>
+              <li className="flex items-center text-primary text-base">
+                <span className="mr-2">✔️</span>A device with a camera for selfie
+                verification
+              </li>
+            </ul>
+            <div className="flex flex-col gap-4 w-full max-w-md px-4">
+              <Button
+                className="bg-primary text-primary-foreground hover:bg-primary/90 w-full py-4 text-base font-semibold rounded-lg"
+                style={{ minWidth: 0 }}
+                onClick={handlePersonaVerification}
+                disabled={isVerifying || personaVerification}
               >
-                Contact support
-              </a>
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Starting Verification...
+                  </>
+                ) : personaVerification ? (
+                  "Verification Completed"
+                ) : (
+                  "Start Verification"
+                )}
+              </Button>
+              <Button
+                className="bg-muted text-primary w-full py-4 text-base font-semibold border border-primary rounded-lg"
+                style={{ minWidth: 0 }}
+                variant="outline"
+                onClick={() => {
+                  // Check current status
+                  if (localWalletAddress) {
+                    searchPersonaInquiry(localWalletAddress).then((status) => {
+                      if (status?.status === 'completed' || status?.status === 'approved') {
+                        toast({
+                          title: "Verification Complete",
+                          description: "Your identity verification is already complete.",
+                        });
+                        setPersonaVerification(true);
+                        setVerificationDone(true);
+                        router.push('/form');
+                      } else {
+                        toast({
+                          title: "Verification Pending",
+                          description: "Your identity verification is still in progress.",
+                        });
+                      }
+                    });
+                  }
+                }}
+              >
+                Check my Status
+              </Button>
+              <button
+                className="text-muted-foreground text-sm font-medium hover:text-primary transition-colors duration-200 mt-2"
+                onClick={() => {
+                  // Go back to previous page or close modal
+                  router.back();
+                }}
+              >
+                Go Back
+              </button>
+            </div>
+            <div className="w-full max-w-md px-4">
+              <div className="border-t border-border mb-3"></div>
+              <div className="text-muted-foreground text-sm mb-2 text-center">
+                Having trouble?
+              </div>
+              <div className="text-center">
+                <a
+                  href="#"
+                  className="text-primary underline text-sm font-medium"
+                >
+                  Contact support
+                </a>
+              </div>
             </div>
           </div>
         </div>
