@@ -111,11 +111,11 @@ export function EnhancedDeviceVerificationFlow() {
   const searchPersonaInquiry = async (referenceID: string) => {
     try {
       const backendUrl = getSafeBackendUrl();
-      const res = await fetch(`${backendUrl}/persona/status/${encodeURIComponent(referenceID)}`, {
+      const res = await fetch(`${backendUrl}/persona/inquiry/${encodeURIComponent(referenceID)}`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
       });
-      
+
       if (!res.ok) {
         if (res.status === 404) {
           console.warn('No inquiry found for referenceId:', referenceID);
@@ -123,7 +123,7 @@ export function EnhancedDeviceVerificationFlow() {
         }
         throw new Error(`Request failed: ${res.status}`);
       }
-      
+
       const data = await res.json();
       console.log('🔍 Persona status response:', data);
       return data;
