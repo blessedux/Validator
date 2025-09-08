@@ -241,7 +241,7 @@ Change the admin address.
 
 #### What's Currently Working
 
-✅ **Contract Address**: Correctly configured as `CBS3QODERORJH4GPDAWNQMUNTB4O6LO6NUETRXE5H2NSR3G542QOWKTN`
+✅ **Contract Address**: Address needs update `CBS3QODERORJH4GPDAWNQMUNTB4O6LO6NUETRXE5H2NSR3G542QOWKTN`
 
 ✅ **SDK Integration**: Using `@stellar/stellar-sdk` ^13.3.0 and `soroban-client` ^1.0.1
 
@@ -249,7 +249,7 @@ Change the admin address.
 
 ✅ **Metadata Storage**: Using payment operations with memos to store validation metadata
 
-✅ **Wallet Integration**: Working with Freighter and Simple Stellar Signer
+✅ **Wallet Integration**: Working with Freighter 
 
 #### What's Not Yet Implemented
 
@@ -259,7 +259,7 @@ Change the admin address.
 
 ❌ **Whitelist Management**: Not using contract whitelist functions
 
-❌ **Project Status Queries**: Not querying contract for project statuses
+✅ **Project Status Queries**: Not querying contract for project statuses
 
 ### Contract Storage
 
@@ -492,14 +492,14 @@ soroban contract invoke \
 ```env
 STELLAR_NETWORK=testnet
 STELLAR_RPC_URL=https://soroban-testnet.stellar.org
-CONTRACT_ID=CBS3QODERORJH4GPDAWNQMUNTB4O6LO6NUETRXE5H2NSR3G542QOWKTN
+CONTRACT_ID=CBD33YTADJSQHRVPKUJPVKJZBGGXBWJ5WW44MUPEQ4XUXBSO6LEKZ724
 ```
 
 ### Support and Resources
 
 - [Soroban Documentation](https://soroban.stellar.org/docs)
 - [Stellar Documentation](https://developers.stellar.org/docs)
-- [Contract Explorer](https://stellar.expert/explorer/testnet/contract/CBS3QODERORJH4GPDAWNQMUNTB4O6LO6NUETRXE5H2NSR3G542QOWKTN)
+- [Contract Explorer](https://stellar.expert/explorer/testnet/contract/CBD33YTADJSQHRVPKUJPVKJZBGGXBWJ5WW44MUPEQ4XUXBSO6LEKZ724)
 
 ### License
 

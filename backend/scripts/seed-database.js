@@ -8,7 +8,7 @@ async function seedDatabase() {
   try {
     // Create admin user
     const adminWallet = 'GCKFBEIYTKP6RJGWLOUQBCGWDLNVTQJDKB7NQIU7SFJBQYDVD5GQJJQJ'
-    
+
     const adminUser = await prisma.user.upsert({
       where: { walletAddress: adminWallet },
       update: {},
@@ -38,7 +38,7 @@ async function seedDatabase() {
 
     // Create test user
     const testWallet = 'GABCDEF1234567890ABCDEF1234567890ABCDEF12'
-    
+
     const testUser = await prisma.user.upsert({
       where: { walletAddress: testWallet },
       update: {},
@@ -80,7 +80,8 @@ async function seedDatabase() {
         currentValue: '14500',
         expectedRevenue: '2500',
         operationalCosts: '200',
-        status: 'PENDING'
+        status: 'PENDING',
+        location: "Santiago, Chile"
       },
       {
         deviceName: 'Wind Turbine Beta',
@@ -95,7 +96,8 @@ async function seedDatabase() {
         currentValue: '24000',
         expectedRevenue: '4000',
         operationalCosts: '300',
-        status: 'APPROVED'
+        status: 'APPROVED',        
+        location: "Santiago, Chile"
       },
       {
         deviceName: 'Battery Storage Gamma',
@@ -110,7 +112,8 @@ async function seedDatabase() {
         currentValue: '78000',
         expectedRevenue: '12000',
         operationalCosts: '500',
-        status: 'REJECTED'
+        status: 'REJECTED',
+        location: "Santiago, Chile"
       }
     ]
 

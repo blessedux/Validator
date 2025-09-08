@@ -46,10 +46,9 @@ import { adminConfigService } from "@/lib/admin-config";
 import { apiService, Submission } from "@/lib/api-service";
 import { isAuthenticated } from "@/lib/auth";
 import { useSearchParams, useRouter } from "next/navigation";
-import {
-  stellarContractService,
-  signTransactionWithSimpleSigner,
-} from "@/lib/stellar-contract";
+import { freighterService } from '@/lib/freighter-service'
+
+import { stellarContractService } from "@/lib/stellar-contract";
 
 const statusColors = {
   PENDING: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -282,46 +281,33 @@ export function SubmissionReview({
         isApproved ? "APPROVED" : "REJECTED",
       );
 
-      // Create or update admin review (temporarily disabled due to backend issues)
-      console.log(
-        "📝 Admin review data (not saved to backend due to 500 error):",
-        {
-          submission_id: submission.id,
-          notes: reviewerNotes,
-          technical_score: trufaScores.technical[0],
-          regulatory_score: trufaScores.regulatory[0],
-          financial_score: trufaScores.financial[0],
-          environmental_score: 85, // Default environmental score
-          overall_score: averageScore,
-          decision: isApproved ? "APPROVED" : "REJECTED",
-        },
-      );
+      if (!updateResponse || !updateResponse.success) {
+        throw new Error("Failed to update submission status in database");
+      }
 
       // Create TRUFA metadata using production-ready service
       const metadata = stellarContractService.createTrufaMetadata({
         submissionId: submission.id,
-        deviceName: submission.device_name || "N/A",
-        deviceType: submission.device_type || "N/A",
-        operatorWallet: submission.user?.wallet_address || "N/A",
+        deviceName: submission.deviceName || "N/A",
+        deviceType: submission.deviceType || "N/A",
+        operatorWallet: submission.user?.walletAddress || "N/A",
         validatorWallet: connectedWallet,
         trufaScores: {
           technical: trufaScores.technical[0],
           regulatory: trufaScores.regulatory[0],
           financial: trufaScores.financial[0],
-          environmental: 85, // Default environmental score
+          environmental: 85,
           overall: averageScore,
         },
         decision: isApproved ? "APPROVED" : "REJECTED",
       });
-      console.log("📋 Created TRUFA metadata:", metadata);
+      console.log("Created TRUFA metadata:", metadata);
 
-      // Defensive: check all required metadata fields
       if (
-        !metadata.submissionId ||
-        !metadata.deviceName ||
-        !metadata.deviceType ||
-        !metadata.operatorWallet
+        !metadata.submissionId
+
       ) {
+        console.log(metadata.submissionId, metadata.deviceName, metadata.deviceType, metadata.operatorWallet);
         toast({
           title: "Metadata Error",
           description: "Some required metadata fields are missing.",
@@ -350,23 +336,14 @@ export function SubmissionReview({
       await stellarContractService.initialize();
 
       // Create transaction signing function using the connected wallet
-      const signTransaction = async (
-        transactionXdr: string,
-      ): Promise<string> => {
-        console.log("🔐 Requesting transaction signature from wallet...");
-        console.log(
-          "📝 Transaction XDR to sign:",
-          transactionXdr.slice(0, 100) + "...",
-        );
-
-        // Use Simple Signer to sign the transaction
-        const signedTransactionXdr = await signTransactionWithSimpleSigner(
-          transactionXdr,
-          connectedWallet,
-        );
-        console.log("✅ Transaction signed successfully");
-
-        return signedTransactionXdr;
+      const signTransaction = async (transactionXdr: string): Promise<string> => {
+        
+        const signedXdr = await freighterService.signTransaction(transactionXdr, {
+          networkPassphrase: 'Test SDF Network ; September 2015', // CHANGE IF USING MAINNET
+          accountToSign: connectedWallet
+        })
+      
+        return signedXdr;
       };
 
       // Submit to Stellar contract
@@ -381,13 +358,17 @@ export function SubmissionReview({
         setStellarTxHash(contractResult.transactionHash);
         setIsSubmitted(true);
         setTxStatus("confirmed");
-
+        // Generate and send certificate on backend
+        const certResponse = await apiService.generateCertificate(
+          submission.id,
+          contractResult.transactionHash,
+        );
         toast({
-          title: "Validation Submitted to Stellar! 🎉",
+          title: "Validation Submitted to Stellar!",
           description: `Decision: ${isApproved ? "APPROVED" : "REJECTED"} | Score: ${averageScore}/100 | Tx: ${contractResult.transactionHash.slice(0, 8)}...`,
         });
 
-        console.log("✅ Stellar contract submission successful:", {
+        console.log("Stellar contract submission successful:", {
           submissionId: submission.id,
           decision: isApproved ? "APPROVED" : "REJECTED",
           trufaScore: averageScore,
@@ -395,6 +376,11 @@ export function SubmissionReview({
           transactionHash: contractResult.transactionHash,
           adminWallet: connectedWallet,
         });
+
+        console.log(
+          "Certificate generation response from backend:",
+          certResponse,
+        )
       } else {
         throw new Error(contractResult.error || "Contract submission failed");
       }
@@ -404,6 +390,7 @@ export function SubmissionReview({
         description: error instanceof Error ? error.message : "Unknown error",
         variant: "destructive",
       });
+      console.log("Error during submission:", error);
     } finally {
       setIsSubmitting(false);
     }

@@ -9,6 +9,7 @@ import { prisma } from './lib/database'
 import { userService, profileService, submissionService, authService, adminReviewService, draftService } from './lib/database'
 import { env } from './lib/env-validation'
 import { handlePersonaWebhook, lastPersonaVerification } from './lib/personaWebhook'
+import { certificateService } from './lib/certificate-service'
 
 const app = express();
 const PORT = env.PORT;
@@ -582,6 +583,68 @@ app.post('/persona/inquiry/:referenceID', async (req, res) => {
     return res.status(500).json({ error: 'Failed to set status to pending' });
   }
 });
+
+// Create certificate 
+app.post("/certificate/generate/:submissionId/:stellarHash", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authorization header required" });
+    }
+
+    const token = authHeader.substring(7);
+    const jwt = require("jsonwebtoken");
+    const decoded = jwt.verify(token, env.JWT_SECRET);
+    const { walletAddress } = decoded;
+
+    const user = await userService.getByWallet(walletAddress);
+    if (user?.role !== "ADMIN") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { submissionId, stellarTxHash } = req.body;
+
+    if (!submissionId) {
+      return res.status(400).json({ error: "submissionId is required" });
+    }
+
+    console.log('Generating certificate for submission:', submissionId);
+    
+    const metadata = { submissionId, stellarTxHash }; 
+
+    const result = await certificateService.generateAndSendCertificate({
+      submissionId,
+      stellarTxHash,
+      adminWalletAddress: walletAddress
+    });
+
+    if (result.success) {
+      console.log('Certificate generated successfully:', result.certificate?.id);
+      return res.json({
+        success: true,
+        message: "Certificate generated and sent successfully",
+        certificate: result.certificate,
+        emailSent: result.emailSent,
+        certificatePath: result.certificatePath,
+      });
+    } else {
+      console.error('Certificate generation failed:', result.error);
+      return res.status(400).json({
+        success: false,
+        error: result.error || "Failed to generate certificate"
+      });
+    }
+
+  } catch (error) {
+    console.error("Certificate generation endpoint error:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Internal server error during certificate generation"
+    });
+  }
+});
+
+
 
 // Database test endpoint
 app.get("/test-db", async (req, res) => {

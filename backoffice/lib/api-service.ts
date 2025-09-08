@@ -15,9 +15,9 @@ function getSafeBackendUrl(): string {
   if (typeof window !== 'undefined' && window.location.hostname === 'backoffice.dobprotocol.com') {
     return 'https://v.dobprotocol.com'
   }
-  
+
   // In development, use the environment variable or default
-  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001'
+  return process.env.NEXT_PUBLIC_BACKEND_URL || 'https://localhost:4000'
 }
 
 const API_BASE_URL = getSafeBackendUrl()
@@ -116,12 +116,12 @@ class ApiService {
   // Get authentication token from localStorage
   private getAuthToken(): string | null {
     if (this.authToken) return this.authToken
-    
+
     if (typeof window === 'undefined') return null
-    
+
     const authData = localStorage.getItem('authToken')
     if (!authData) return null
-    
+
     try {
       const parsed = JSON.parse(authData)
       // Extract just the token string, not the whole object
@@ -141,7 +141,7 @@ class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = this.getAuthToken()
     const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint}`
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'x-backoffice-request': 'true', // Important: Mark as backoffice request for admin access
@@ -178,21 +178,21 @@ class ApiService {
     offset?: number
   }): Promise<{ submissions: Submission[]; total: number; hasMore?: boolean }> {
     const params = new URLSearchParams()
-    
+
     if (options?.status) params.append('status', options.status)
     if (options?.limit) params.append('limit', options.limit.toString())
     if (options?.offset) params.append('offset', options.offset.toString())
 
     const queryString = params.toString()
     const endpoint = `/api/submissions${queryString ? `?${queryString}` : ''}`
-    
+
     const response = await this.request<{
       success: boolean
       submissions: Submission[]
       total: number
       hasMore?: boolean
     }>(endpoint)
-    
+
     return {
       submissions: response.submissions || [],
       total: response.total || 0,
@@ -235,6 +235,33 @@ class ApiService {
     }
   }
 
+  async updateSubmissionStatus(
+    submissionId: string,
+    status: 'DRAFT' | 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'
+  ): Promise<{ success: boolean; submission?: Submission; message?: string }> {
+    try {
+      const response = await this.request<{
+        success: boolean
+        submission: Submission
+        message?: string
+      }>(`/api/submissions/${submissionId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      })
+
+      logWithDOBArt(`Submission ${submissionId} status updated to ${status}`, 'success')
+      return {
+        success: response.success,
+        submission: response.submission,
+        message: response.message
+      }
+    } catch (error) {
+      logWithDOBArt(`Failed to update submission ${submissionId} status`, 'error')
+      console.error('Update status error:', error)
+      throw error
+    }
+  }
+
   // Get all drafts (admin access)
   async getAllDrafts(options?: {
     limit?: number
@@ -247,12 +274,12 @@ class ApiService {
 
       const queryString = params.toString()
       const endpoint = `/api/drafts${queryString ? `?${queryString}` : ''}`
-      
+
       const response = await this.request<{
         success: boolean
         drafts: any[]
       }>(endpoint)
-      
+
       return response.drafts || []
     } catch (error) {
       logWithDOBArt('Failed to fetch drafts', 'error')
@@ -291,7 +318,7 @@ class ApiService {
       success: boolean
       submission: Submission
     }>(`/api/submissions/${id}`)
-    
+
     return response.submission
   }
 
@@ -309,6 +336,26 @@ class ApiService {
     return this.request<AdminReview>('/api/admin-reviews', {
       method: 'POST',
       body: JSON.stringify(reviewData),
+    })
+  }
+
+  async generateCertificate(
+    submissionId: string,
+    stellarTxHash?: string,
+    metadata?: Record<string, any>
+  ): Promise<{ success: boolean; certificate?: Certificate; message?: string }> {
+    if (!submissionId) {
+      throw new Error('submissionId is required')
+    }
+
+    const endpoint = `/certificate/generate/${submissionId}/${stellarTxHash || ''}`
+
+    const body: any = { submissionId }
+    if (stellarTxHash) body.stellarTxHash = stellarTxHash
+    if (metadata) body.metadata = metadata 
+    return this.request<{ success: boolean; certificate?: Certificate; message?: string }>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body),
     })
   }
 
