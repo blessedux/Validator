@@ -83,12 +83,12 @@ export function SubmissionsList() {
   const filteredSubmissions = submissions.filter((submission) => {
     const matchesSearch =
       searchTerm === "" ||
-      submission.device_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      submission.deviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       submission.manufacturer
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       submission.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      submission.user?.wallet_address
+      submission.user?.walletAddress
         ?.toLowerCase()
         .includes(searchTerm.toLowerCase());
 
@@ -186,7 +186,7 @@ export function SubmissionsList() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold text-foreground">
-                        {submission.device_name}
+                        {submission.deviceName}
                       </h3>
                       <Badge
                         className={
@@ -207,8 +207,8 @@ export function SubmissionsList() {
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-muted-foreground" />
                         <span>
-                          {submission.user?.wallet_address
-                            ? `${submission.user.wallet_address.slice(0, 8)}...${submission.user.wallet_address.slice(-8)}`
+                          {submission.user?.walletAddress
+                            ? `${submission.user.walletAddress.slice(0, 8)}...${submission.user.walletAddress.slice(-8)}`
                             : "Unknown"}
                         </span>
                       </div>
@@ -216,7 +216,7 @@ export function SubmissionsList() {
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         <span>
                           {new Date(
-                            submission.submitted_at,
+                            submission.submittedAt,
                           ).toLocaleDateString()}
                         </span>
                       </div>
@@ -231,7 +231,7 @@ export function SubmissionsList() {
                       <div>
                         <span className="text-muted-foreground">Type:</span>
                         <p className="font-medium text-foreground">
-                          {submission.device_type}
+                          {submission.deviceType}
                         </p>
                       </div>
                       <div>
@@ -243,13 +243,13 @@ export function SubmissionsList() {
                       <div>
                         <span className="text-muted-foreground">Serial:</span>
                         <p className="font-medium text-foreground">
-                          {submission.serial_number}
+                          {submission.serialNumber}
                         </p>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Value:</span>
                         <p className="font-medium text-foreground">
-                          ${Number(submission.current_value).toLocaleString()}
+                          ${Number(submission.currentValue).toLocaleString()}
                         </p>
                       </div>
                     </div>
