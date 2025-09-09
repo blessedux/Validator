@@ -22,6 +22,7 @@ import {
   Zap,
   Shield,
   TrendingUp,
+  Award,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -833,21 +834,21 @@ export function SubmissionReview({
                     </>
                   ) : (
                     <>
-                      <Shield className="h-4 w-4 mr-2" />
+                      <img
+                        src="/stellar_logo_white_small.svg"
+                        alt="Stellar Logo"
+                        width={20}
+                        height={20}
+                        className="mr-2"
+                        style={{
+                          display: "inline-block",
+                          verticalAlign: "middle",
+                        }}
+                      />
                       Sign & Submit to Stellar
                     </>
                   )}
                 </Button>
-
-                <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Demo Mode:</strong> This simulation demonstrates the
-                    validation workflow. In production, this would integrate
-                    with a Stellar wallet (Freighter, Albedo, etc.) to sign
-                    actual blockchain transactions.
-                  </AlertDescription>
-                </Alert>
 
                 {!isWalletConnected && (
                   <Alert>
@@ -926,8 +927,8 @@ export function SubmissionReview({
 
                   {txStatus === "confirmed" && (
                     <Button variant="outline" className="w-full">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Certificate
+                      <Award className="h-4 w-4 mr-2" />
+                      Show Certificate
                     </Button>
                   )}
                 </CardContent>
