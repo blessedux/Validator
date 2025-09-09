@@ -2,8 +2,17 @@
   "git": {
     "deploymentEnabled": {
       "main": false,
-      "prod": true
+      "prod": true,
+      "develop": false,
+      "staging": false,
+      "preview": false
     }
   },
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet ./frontend ./backoffice ./dobhub"
+  "buildCommand": "echo 'Deployment controlled by branch settings'",
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"prod\" ]; then echo '🚫 Skipping deployment for non-production branch: $VERCEL_GIT_COMMIT_REF'; exit 1; fi",
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  }
 }
