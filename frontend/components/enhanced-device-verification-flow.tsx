@@ -57,6 +57,13 @@ export function EnhancedDeviceVerificationFlow() {
   const [currentStep, setCurrentStep] = useState(1);
   const [verificationDone, setVerificationDone] = useState(false);
 
+  // Persona KYC integration states
+  const [personaVerification, setPersonaVerification] = useState(false);
+  const [localWalletAddress, setLocalWalletAddress] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const verificationWindowRef = useRef<Window | null>(null);
+  const pollRef = useRef<number | null>(null);
+
   const [deviceData, setDeviceData] = useState<DeviceData>({
     deviceName: "",
     deviceType: "",
@@ -80,6 +87,7 @@ export function EnhancedDeviceVerificationFlow() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isCheckingVerification, setCheckingVerification] = useState(true);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [failedSaveAttempts, setFailedSaveAttempts] = useState(0);
   const [hasShownFirstSaveToast, setHasShownFirstSaveToast] = useState(false);
@@ -97,14 +105,211 @@ export function EnhancedDeviceVerificationFlow() {
 
   const totalSteps = 4;
 
-  // Initialize verification state
+  // Persona KYC integration functions
+  const getSafeBackendUrl = () => {
+    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+  };
+
+  const searchPersonaInquiry = async (referenceID: string) => {
+    try {
+      const backendUrl = getSafeBackendUrl();
+      const res = await fetch(`${backendUrl}/persona/inquiry/${encodeURIComponent(referenceID)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('No inquiry found for referenceId:', referenceID);
+          return null;
+        }
+        throw new Error(`Request failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log('Persona status response:', data);
+      return data;
+    } catch (error) {
+      console.error('Error searching Persona inquiry:', error);
+      return null;
+    }
+  };
+
   useEffect(() => {
-    setVerificationDone(false);
+    const wallet = localStorage.getItem('walletAddress') || localStorage.getItem('stellarPublicKey');
+    setLocalWalletAddress(wallet);
+
+    const checkPersonaVerification = async () => {
+      if (wallet) {
+        const result = await searchPersonaInquiry(wallet);
+        if (result && (result.status === 'completed')) {
+          setPersonaVerification(true);
+          setVerificationDone(true);
+          setCheckingVerification(false);
+        } else {
+
+          setVerificationDone(false);
+          setCheckingVerification(false);
+        }
+      } else {
+        setVerificationDone(false);
+        setCheckingVerification(false);
+      }
+    };
+
+    checkPersonaVerification();
+  }, []);
+
+  const createPersonaInquiry = async () => {
+    try {
+      const backendUrl = getSafeBackendUrl();
+      const payload = { localWalletAddress };
+
+      const res = await fetch(`${backendUrl}/persona/inquiry`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log('🔍 Inquiry created:', data);
+
+      const inquiryId = data?.result?.data?.id;
+      if (!inquiryId) {
+        throw new Error('Inquiry ID missing in response');
+      }
+
+      // CREATE ONE-TIME-LINK
+      const linkRes = await fetch(
+        `${backendUrl}/persona/inquiry/${encodeURIComponent(inquiryId)}/generate-one-time-link`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!linkRes.ok) {
+        throw new Error(`Failed to generate one-time link: ${linkRes.status}`);
+      }
+
+      const linkData = await linkRes.json();
+      console.log('🔍 One-time link:', linkData);
+      return linkData.link || linkData.data?.attributes?.href || null;
+
+    } catch (error) {
+      console.error('ERROR CREATING INQUIRY OR LINK', error);
+      return null;
+    }
+  };
+
+  // WEBHOOK HANDLER - Simple implementation from mati-brach-dev
+  async function handlePersonaWebhook(localWalletAddress: string) {
+    try {
+      const res = await fetch(`${getSafeBackendUrl()}/persona/inquiry/${encodeURIComponent(localWalletAddress)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('No inquiry found for referenceId:', localWalletAddress);
+          return null;
+        }
+        throw new Error(`Request failed: ${res.status}`);
+      }
+      return await res.json();
+    } catch (err) {
+      console.error('Error handling Persona webhook:', err);
+    }
+  }
+
+  const handlePersonaVerification = useCallback(async () => {
+    if (personaVerification) {
+      return;
+    }
+
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+
+    if (!localWalletAddress) {
+      return console.error('Wallet address is required to create Persona inquiry', localStorage);
+    }
+
+    const oneTimeLink = await createPersonaInquiry();
+    if (!oneTimeLink) {
+      return console.error('Failed to create Persona inquiry or one-time link');
+    }
+
+    const personaWindow = window.open(oneTimeLink, "_blank");
+    verificationWindowRef.current = personaWindow;
+    setPersonaVerification(true);
+
+    console.log('STARTING PERSONA VERIFICATION FLOW ON:', oneTimeLink);
+    console.log('WAITING FOR PERSONA VERIFICATION TO COMPLETE...');
+
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const webhookResponse = await handlePersonaWebhook(localWalletAddress);
+        if (webhookResponse?.status === 'completed' || webhookResponse?.status === 'approved' || webhookResponse?.status === 'passed') {
+          verificationWindowRef.current?.close();
+          verificationWindowRef.current = null;
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          setPersonaVerification(true);
+          setVerificationDone(true);
+
+          // Show success message
+          toast({
+            title: "Verification Complete!",
+            description: "Your identity has been successfully verified. Redirecting to form...",
+          });
+
+          // Redirect to form
+          router.push('/form');
+        } else {
+          console.log('Persona verification not completed yet.');
+        }
+      } catch (error) {
+        console.error('Error polling Persona webhook:', error);
+      }
+    }, 5000);
+  }, [localWalletAddress, personaVerification, router]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, []);
+
+
+
+  // Cleanup Persona window on unmount
+  useEffect(() => {
+    return () => {
+      if (verificationWindowRef.current) {
+        verificationWindowRef.current.close();
+      }
+    };
   }, []);
 
   // Check for edit mode and load draft if needed
   useEffect(() => {
-    const editId = searchParams.get("edit");
+    const editId = searchParams?.get("edit");
     console.log("🔍 Checking for edit mode, editId:", editId);
     if (editId) {
       console.log("🔍 Edit mode detected, loading draft:", editId);
@@ -645,7 +850,7 @@ export function EnhancedDeviceVerificationFlow() {
       "5. Manufacturer: " + (deviceData.manufacturer || "Not provided"),
       "6. Model: " + (deviceData.model || "Not provided"),
       "7. Year of Manufacture: " +
-        (deviceData.yearOfManufacture || "Not provided"),
+      (deviceData.yearOfManufacture || "Not provided"),
       "8. Condition: " + (deviceData.condition || "Not provided"),
       "9. Specifications: " + (deviceData.specifications || "Not provided"),
       "\nSTEP 3: FINANCIAL INFORMATION",
@@ -653,18 +858,18 @@ export function EnhancedDeviceVerificationFlow() {
       "11. Current Value: " + (deviceData.currentValue || "Not provided"),
       "12. Expected Revenue: " + (deviceData.expectedRevenue || "Not provided"),
       "13. Operational Costs: " +
-        (deviceData.operationalCosts || "Not provided"),
+      (deviceData.operationalCosts || "Not provided"),
       "\nSTEP 4: DOCUMENTATION",
       "14. Technical Certification: " +
-        (deviceData.technicalCertification ? "Uploaded" : "Not uploaded"),
+      (deviceData.technicalCertification ? "Uploaded" : "Not uploaded"),
       "15. Purchase Proof: " +
-        (deviceData.purchaseProof ? "Uploaded" : "Not uploaded"),
+      (deviceData.purchaseProof ? "Uploaded" : "Not uploaded"),
       "16. Maintenance Records: " +
-        (deviceData.maintenanceRecords ? "Uploaded" : "Not uploaded"),
+      (deviceData.maintenanceRecords ? "Uploaded" : "Not uploaded"),
       "17. Device Images: " +
-        (deviceData.deviceImages.length > 0
-          ? `${deviceData.deviceImages.length} images uploaded`
-          : "No images uploaded"),
+      (deviceData.deviceImages.length > 0
+        ? `${deviceData.deviceImages.length} images uploaded`
+        : "No images uploaded"),
       "\n=== END OF FORM ===",
     ].join("\n");
 
@@ -747,25 +952,23 @@ export function EnhancedDeviceVerificationFlow() {
                 <div key={index} className="flex items-center">
                   <button
                     onClick={() => goToStep(index + 1)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 shadow-md ${
-                      index + 1 === currentStep
-                        ? "bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/20 scale-110 step-indicator-active"
-                        : index + 1 < currentStep
-                          ? "bg-primary/20 text-primary border-2 border-primary hover:bg-primary/30 hover:scale-105"
-                          : "bg-muted text-muted-foreground border-2 border-muted hover:bg-muted/80 hover:border-primary/50 hover:scale-105"
-                    }`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 shadow-md ${index + 1 === currentStep
+                      ? "bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/20 scale-110 step-indicator-active"
+                      : index + 1 < currentStep
+                        ? "bg-primary/20 text-primary border-2 border-primary hover:bg-primary/30 hover:scale-105"
+                        : "bg-muted text-muted-foreground border-2 border-muted hover:bg-muted/80 hover:border-primary/50 hover:scale-105"
+                      }`}
                   >
                     {index + 1}
                   </button>
                   {index < totalSteps - 1 && (
                     <div
-                      className={`h-0.5 w-8 transition-all duration-400 ease-in-out rounded-full ${
-                        index + 1 < currentStep
-                          ? "bg-primary scale-x-100"
-                          : index + 1 === currentStep
-                            ? "bg-gradient-to-r from-primary to-muted scale-x-75"
-                            : "bg-muted scale-x-50"
-                      }`}
+                      className={`h-0.5 w-8 transition-all duration-400 ease-in-out rounded-full ${index + 1 < currentStep
+                        ? "bg-primary scale-x-100"
+                        : index + 1 === currentStep
+                          ? "bg-gradient-to-r from-primary to-muted scale-x-75"
+                          : "bg-muted scale-x-50"
+                        }`}
                     />
                   )}
                 </div>
@@ -790,7 +993,7 @@ export function EnhancedDeviceVerificationFlow() {
             key={`basic-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
+            onNext={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -854,8 +1057,8 @@ export function EnhancedDeviceVerificationFlow() {
             key={`technical-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
-            onBack={() => {}}
+            onNext={() => { }}
+            onBack={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -914,8 +1117,8 @@ export function EnhancedDeviceVerificationFlow() {
             key={`financial-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
-            onBack={() => {}}
+            onNext={() => { }}
+            onBack={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -979,8 +1182,8 @@ export function EnhancedDeviceVerificationFlow() {
             key={`documentation-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
-            onBack={() => {}}
+            onNext={() => { }}
+            onBack={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -1057,6 +1260,14 @@ export function EnhancedDeviceVerificationFlow() {
     );
   }
 
+  if (isCheckingVerification) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh]">        
+        <p className="text-muted-foreground">Checking verification status...</p>
+      </div>
+    );
+  }
+
   if (isLoadingDraft) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -1071,68 +1282,125 @@ export function EnhancedDeviceVerificationFlow() {
       {/* Identity Verification Modal - Show directly when component loads */}
       {!verificationDone && (
         <div
-          className="flex flex-col items-center justify-center min-h-screen w-full text-card-foreground transition-all duration-500 opacity-100 scale-100"
+          className="fixed top-0 left-0 h-screen w-full flex flex-col items-center justify-center text-card-foreground transition-all duration-500 opacity-100 scale-100"
+          style={{ margin: 0, padding: 0 }}
         >
-          <img
-            src="/images/dob imagotipo.svg"
-            alt="DOB Imagotipo"
-            className="w-80 h-80 mb-2"
-          />
-          <div className="bg-primary w-full max-w-md rounded-lg text-primary-foreground text-lg font-bold text-center px-4 py-2 mb-2">
-            Identity Verification
-          </div>
-          <div className="text-muted-foreground text-sm text-center px-4 mb-4 max-w-md">
-            Please complete identity verification to access your account. You'll
-            need:
-          </div>
-          <ul className="w-full max-w-md px-4 mb-6 space-y-2">
-            <li className="flex items-center text-primary text-base">
-              <span className="mr-2">✔️</span>A valid government-issued ID
-            </li>
-            <li className="flex items-center text-primary text-base">
-              <span className="mr-2">✔️</span>A device with a camera for selfie
-              verification
-            </li>
-          </ul>
-          <div className="flex flex-col gap-4 w-full max-w-md px-4 mb-6">
-            <Button
-              className="bg-primary text-primary-foreground hover:bg-primary/90 w-full py-4 text-base font-semibold rounded-lg"
-              style={{ minWidth: 0 }}
-              onClick={() => {
-                setVerificationDone(true);
-              }}
-            >
-              Start Verification
-            </Button>
-            <Button
-              className="bg-muted text-primary w-full py-4 text-base font-semibold border border-primary rounded-lg"
-              style={{ minWidth: 0 }}
-              variant="outline"
-            >
-              Check my Status
-            </Button>
-            <button
-              className="text-muted-foreground text-sm font-medium hover:text-primary transition-colors duration-200 mt-2"
-              onClick={() => {
-                // Go back to previous page or close modal
-                router.back();
-              }}
-            >
-              Go Back
-            </button>
-          </div>
-          <div className="w-full max-w-md px-4">
-            <div className="border-t border-border mb-3"></div>
-            <div className="text-muted-foreground text-sm mb-2 text-center">
-              Having trouble?
+          <div className="space-y-4">
+            <img
+              src="/images/dob imagotipo.svg"
+              alt="DOB Imagotipo"
+              className="w-48 h-48 mx-auto"
+            />
+            <div className="bg-primary w-full max-w-md rounded-lg text-primary-foreground text-lg font-bold text-center px-4 py-2">
+              Identity Verification
             </div>
-            <div className="text-center">
-              <a
-                href="#"
-                className="text-primary underline text-sm font-medium"
+            <div className="text-muted-foreground text-sm text-center px-4 max-w-md">
+              Please complete identity verification to access your account. You'll
+              need:
+            </div>
+            <ul className="w-full max-w-md px-4 space-y-2">
+              <li className="flex items-center text-primary text-base">
+                <span className="mr-2">✔️</span>A valid government-issued ID
+              </li>
+              <li className="flex items-center text-primary text-base">
+                <span className="mr-2">✔️</span>A device with a camera for selfie
+                verification
+              </li>
+            </ul>
+            <div className="flex flex-col gap-4 w-full max-w-md px-4">
+              <Button
+                className="bg-primary text-primary-foreground hover:bg-primary/90 w-full py-4 text-base font-semibold rounded-lg"
+                style={{ minWidth: 0 }}
+                onClick={handlePersonaVerification}
+                disabled={isVerifying || personaVerification}
               >
-                Contact support
-              </a>
+                {isCheckingVerification ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Starting Verification...
+                  </>
+                ) : personaVerification ? (
+                  "Verification Completed"
+                ) : (
+                  "Start Verification"
+                )}
+              </Button>
+              <Button
+                className="bg-muted text-primary w-full py-4 text-base font-semibold border border-primary rounded-lg"
+                style={{ minWidth: 0 }}
+                variant="outline"
+                onClick={() => {
+                  // Check current status using simple webhook approach
+                  if (localWalletAddress) {
+                    handlePersonaWebhook(localWalletAddress).then((webhookResponse) => {
+                      if (webhookResponse?.status === 'completed' || webhookResponse?.status === 'approved' || webhookResponse?.status === 'passed') {
+                        toast({
+                          title: "Verification Complete",
+                          description: "Your identity verification is already complete.",
+                        });
+                        setPersonaVerification(true);
+                        setVerificationDone(true);
+                        router.push('/form');
+                      } else {
+                        toast({
+                          title: "Verification Pending",
+                          description: `Your identity verification is still in progress. Status: ${webhookResponse?.status || 'unknown'}`,
+                        });
+                      }
+                    });
+                  }
+                }}
+              >
+                Check my Status
+              </Button>
+
+              {isVerifying && verificationWindowRef.current && (
+                <Button
+                  className="bg-red-600 text-white w-full py-4 text-base font-semibold rounded-lg"
+                  style={{ minWidth: 0 }}
+                  onClick={() => {
+                    if (verificationWindowRef.current) {
+                      verificationWindowRef.current.close();
+                      verificationWindowRef.current = null;
+                    }
+                    if (pollRef.current) {
+                      clearInterval(pollRef.current);
+                      pollRef.current = null;
+                    }
+                    setPersonaVerification(false);
+                    setIsVerifying(false);
+                    toast({
+                      title: "Verification Cancelled",
+                      description: "You can restart the verification process anytime.",
+                    });
+                  }}
+                >
+                  Close Verification Window
+                </Button>
+              )}
+              <button
+                className="text-muted-foreground text-sm font-medium hover:text-primary transition-colors duration-200 mt-2"
+                onClick={() => {
+                  // Go back to previous page or close modal
+                  router.back();
+                }}
+              >
+                Go Back
+              </button>
+            </div>
+            <div className="w-full max-w-md px-4">
+              <div className="border-t border-border mb-3"></div>
+              <div className="text-muted-foreground text-sm mb-2 text-center">
+                Having trouble?
+              </div>
+              <div className="text-center">
+                <a
+                  href="#"
+                  className="text-primary underline text-sm font-medium"
+                >
+                  Contact support
+                </a>
+              </div>
             </div>
           </div>
         </div>
