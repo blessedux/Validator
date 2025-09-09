@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Frontend dependencies
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    versioning-strategy: auto
+    labels:
+      - "npm"
+      - "dependencies"
+      - "security"
+
+  # Backend dependencies
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    versioning-strategy: auto
+    labels:
+      - "npm"
+      - "dependencies"
+      - "security"
+
+  # Shared dependencies
+  - package-ecosystem: "npm"
+    directory: "/shared"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    versioning-strategy: auto
+    labels:
+      - "npm"
+      - "dependencies"
+      - "security"

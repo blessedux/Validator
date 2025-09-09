@@ -1,0 +1,9 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "main": false,
+      "prod": true
+    }
+  },
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet ./frontend ./backoffice ./dobhub"
+}
