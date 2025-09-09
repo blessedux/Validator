@@ -111,7 +111,6 @@ test.*
 
 # Vercel deployment files
 .vercel/
-vercel.json
 
 # PNPM store
 .pnpm-store/
