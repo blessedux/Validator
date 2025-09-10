@@ -8,7 +8,7 @@
       "preview": false
     }
   },
-  "buildCommand": "cd ../.. && pnpm install && cd frontend && pnpm build",
+  "buildCommand": "pnpm install && pnpm build",
   "outputDirectory": ".next",
   "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"prod\" ]; then echo '🚫 Skipping deployment for non-production branch: $VERCEL_GIT_COMMIT_REF'; exit 1; fi",
   "functions": {
