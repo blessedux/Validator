@@ -59,6 +59,12 @@ class StellarContractService {
       return transaction.toXDR();
     } catch (error) {
       console.error('Error getting account or building transaction:', error);
+      
+      // Check if it's an account not found error
+      if (error && typeof error === 'object' && 'code' in error && error.code === 404) {
+        throw new Error(`Account not funded: Your wallet ${adminPublic} needs to be funded on Stellar testnet. Please visit https://laboratory.stellar.org/#account-creator?network=testnet and fund your account with testnet XLM.`);
+      }
+      
       throw new Error(`Failed to build transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
