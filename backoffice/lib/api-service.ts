@@ -312,15 +312,6 @@ class ApiService {
     })
   }
 
-  // Authenticate admin and get JWT token from backend
-  async authenticateAdmin(walletAddress: string, signature: string): Promise<{ token: string }> {
-    // First get a challenge
-    const challengeResponse = await this.generateChallenge(walletAddress)
-    
-    // Then verify the signature with the challenge
-    return this.verifySignature(walletAddress, signature, challengeResponse.challenge)
-  }
-
   // Get submission by ID
   async getSubmissionById(id: string): Promise<Submission> {
     const response = await this.request<{
