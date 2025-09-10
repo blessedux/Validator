@@ -350,16 +350,14 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-// Serve static files (profile images, uploads, etc.)
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, "..", "..", "uploads")),
-);
-
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+// Serve static files (profile images, uploads, etc.)
+// Serve static files from uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "..", "..", "uploads")));
 
 // Ping endpoint for basic connectivity testing
 app.get("/api/ping", (req, res) => {
