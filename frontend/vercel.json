@@ -9,9 +9,9 @@
       "*": false
     }
   },
-  "buildCommand": "pnpm install && pnpm build",
+  "buildCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"prod\" ]; then pnpm install && pnpm build; else echo '🚫 Build skipped: $VERCEL_GIT_COMMIT_REF is not prod branch' && exit 0; fi",
   "outputDirectory": ".next",
-  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"prod\" ]; then echo '🚫 Preview deployment skipped: $VERCEL_GIT_COMMIT_REF is not prod branch' && exit 0; fi",
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"prod\" ]; then echo '🚫 Deployment skipped: $VERCEL_GIT_COMMIT_REF is not prod branch' && exit 0; fi",
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 30
