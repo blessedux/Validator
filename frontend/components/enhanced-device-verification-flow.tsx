@@ -113,17 +113,22 @@ export function EnhancedDeviceVerificationFlow() {
     return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
   };
 
-  const searchPersonaInquiry = async (referenceID: string) => {
+  const searchPersonaInquiry = async (walletAddress: string) => {
     try {
       const backendUrl = getSafeBackendUrl();
-      const res = await fetch(`${backendUrl}/persona/inquiry/${encodeURIComponent(referenceID)}`, {
+      const res = await fetch(`${backendUrl}/persona/inquiry/${encodeURIComponent(walletAddress)}`, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: { 
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        },
+        credentials: 'include'
       });
 
       if (!res.ok) {
         if (res.status === 404) {
-          console.warn('No inquiry found for referenceId:', referenceID);
+          console.warn('No inquiry found for wallet:', walletAddress);
           return null;
         }
         throw new Error(`Request failed: ${res.status}`);
@@ -145,21 +150,35 @@ export function EnhancedDeviceVerificationFlow() {
     const checkPersonaVerification = async () => {
       if (wallet) {
         const result = await searchPersonaInquiry(wallet);
-        if (result && (result.status === 'completed')) {
+        if (result && (result.status === 'completed' || result.status === 'approved' || result.status === 'passed')) {
           setPersonaVerification(true);
           setVerificationDone(true);
           setCheckingVerification(false);
+          // Store verification status in localStorage
+          localStorage.setItem('personaVerificationStatus', 'completed');
         } else {
-
+          // Clear verification status from localStorage
+          localStorage.removeItem('personaVerificationStatus');
           setVerificationDone(false);
           setCheckingVerification(false);
         }
       } else {
+        // Clear verification status from localStorage
+        localStorage.removeItem('personaVerificationStatus');
         setVerificationDone(false);
         setCheckingVerification(false);
       }
     };
 
+    // Check localStorage first for quick response
+    const storedStatus = localStorage.getItem('personaVerificationStatus');
+    if (storedStatus === 'completed') {
+      setPersonaVerification(true);
+      setVerificationDone(true);
+      setCheckingVerification(false);
+    }
+
+    // Then verify with backend
     checkPersonaVerification();
   }, []);
 
@@ -173,7 +192,9 @@ export function EnhancedDeviceVerificationFlow() {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          'Origin': window.location.origin
         },
+        credentials: 'include',
         body: JSON.stringify(payload),
       });
 
@@ -197,7 +218,9 @@ export function EnhancedDeviceVerificationFlow() {
           headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
+            'Origin': window.location.origin
           },
+          credentials: 'include'
         }
       );
 
@@ -216,15 +239,20 @@ export function EnhancedDeviceVerificationFlow() {
   };
 
   // WEBHOOK HANDLER - Simple implementation from mati-brach-dev
-  async function handlePersonaWebhook(localWalletAddress: string) {
+  async function handlePersonaWebhook(walletAddress: string) {
     try {
-      const res = await fetch(`${getSafeBackendUrl()}/persona/inquiry/${encodeURIComponent(localWalletAddress)}`, {
+      const res = await fetch(`${getSafeBackendUrl()}/persona/inquiry/${encodeURIComponent(walletAddress)}`, {
         method: 'GET',
-        headers: { Accept: 'application/json' },
+        headers: { 
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
+        },
+        credentials: 'include'
       });
       if (!res.ok) {
         if (res.status === 404) {
-          console.warn('No inquiry found for referenceId:', localWalletAddress);
+          console.warn('No inquiry found for wallet:', walletAddress);
           return null;
         }
         throw new Error(`Request failed: ${res.status}`);
@@ -256,7 +284,7 @@ export function EnhancedDeviceVerificationFlow() {
 
     const personaWindow = window.open(oneTimeLink, "_blank");
     verificationWindowRef.current = personaWindow;
-    setPersonaVerification(true);
+    setIsVerifying(true);
 
     console.log('STARTING PERSONA VERIFICATION FLOW ON:', oneTimeLink);
     console.log('WAITING FOR PERSONA VERIFICATION TO COMPLETE...');

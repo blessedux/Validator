@@ -27,20 +27,8 @@ export const userService = {
         include: { profile: true }
       })
       
-      const existingValidation = await tx.personaValidation.findFirst({
-        where: { referenceId: walletAddress }
-      })
-
-      if (!existingValidation) {
-        const inquiryId = `NOT-ASSIGNED`
-        await tx.personaValidation.create({
-          data: {
-            inquiryId,
-            referenceId: walletAddress,
-            status: 'PENDING'
-          }
-        })
-      }
+      // PersonaValidation will be created when we get a real inquiry ID from Persona
+      // Using user.id as referenceId as per Persona's documentation
 
       return user
     })
@@ -620,4 +608,67 @@ export const adminReviewService = {
       where: { submissionId }
     })
   }
-} 
+}
+
+// =====================
+// PERSONA VALIDATION SERVICES
+// =====================
+
+export const personaValidationService = {
+  // Create or update Persona validation record
+  async upsert(userId: string, inquiryId: string, status: string) {
+    console.log('🔍 Upserting PersonaValidation:', { userId, inquiryId, status });
+    
+    try {
+      // First try to find by inquiryId
+      const existing = await prisma.personaValidation.findUnique({
+        where: { inquiryId }
+      });
+
+      if (existing) {
+        console.log('✅ Found existing validation:', {
+          currentStatus: existing.status,
+          newStatus: status,
+          inquiryId,
+          referenceId: existing.referenceId
+        });
+        return prisma.personaValidation.update({
+          where: { inquiryId },
+          data: {
+            status,
+            updatedAt: new Date()
+          }
+        });
+      }
+
+      // If not found, create new
+      console.log('✅ Creating new validation record');
+      return prisma.personaValidation.create({
+        data: {
+          inquiryId,
+          referenceId: userId,
+          status,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error upserting PersonaValidation:', error);
+      throw error;
+    }
+  },
+
+  // Get validation by inquiry ID
+  async getByInquiryId(inquiryId: string) {
+    return prisma.personaValidation.findUnique({
+      where: { inquiryId }
+    })
+  },
+
+  // Get validation by user ID (reference ID)
+  async getByUserId(userId: string) {
+    return prisma.personaValidation.findFirst({
+      where: { referenceId: userId }
+    })
+  }
+}
