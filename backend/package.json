@@ -27,7 +27,7 @@
   "dependencies": {
     "@prisma/client": "^6.16.0",
     "@stellar/stellar-sdk": "^14.1.1",
-    "@types/nodemailer": "^6.4.17",
+    "@types/nodemailer": "^7.0.1",
     "@types/pdfkit": "^0.13.9",
     "axios": "^1.10.0",
     "cors": "^2.8.5",
@@ -38,7 +38,7 @@
     "http-proxy-middleware": "^3.0.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^7.0.6",
     "pdf-lib": "^1.17.1",
     "pdf-thumbnail": "^1.0.6",
     "pdfkit": "^0.17.2",
