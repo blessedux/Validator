@@ -41,7 +41,7 @@
     "nodemailer": "^6.10.1",
     "pdf-lib": "^1.17.1",
     "pdf-thumbnail": "^1.0.6",
-    "pdfkit": "^0.15.2",
+    "pdfkit": "^0.17.2",
     "sharp": "^0.34.3",
     "soroban-client": "^1.0.1",
     "stellar-sdk": "^13.3.0",
