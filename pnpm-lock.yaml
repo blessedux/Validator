@@ -539,8 +539,8 @@ importers:
         specifier: ^8.1.1
         version: 8.2.0(postcss@8.5.6)(typescript@5.9.2)(webpack@5.101.3)
       style-loader:
-        specifier: ^4.0.0
-        version: 4.0.0(webpack@5.101.3)
+        specifier: ^3.3.3
+        version: 3.3.4(webpack@5.101.3)
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.17
@@ -8145,11 +8145,11 @@ packages:
     resolution: {integrity: sha512-7ZvoFTiCnGxBtDqJ//Cu6fWtZtc7Y3x+QOirG15wztbdngGSkht27o2pyGWrVy0b4WAy3jbKmnoK6g5VlVNUUw==}
     dev: false
 
-  /style-loader@4.0.0(webpack@5.101.3):
-    resolution: {integrity: sha512-1V4WqhhZZgjVAVJyt7TdDPZoPBPNHbekX4fWnCJL1yQukhCeZhJySUL+gL9y6sNdN95uEOS83Y55SqHcP7MzLA==}
-    engines: {node: '>= 18.12.0'}
+  /style-loader@3.3.4(webpack@5.101.3):
+    resolution: {integrity: sha512-0WqXzrsMTyb8yjZJHDqwmnwRJvhALK9LfRtRc6B4UTWe8AijYLZYZ9thuJTZc2VfQWINADW/j+LiJnfy2RoC1w==}
+    engines: {node: '>= 12.13.0'}
     peerDependencies:
-      webpack: ^5.27.0
+      webpack: ^5.0.0
     dependencies:
       webpack: 5.101.3
     dev: true
