@@ -19,8 +19,11 @@ export type FileInfo = {
   id: string;
   name: string;
   type: string;
+  mimetype: string;
   size: number;
-  uploadedAt: string;
+  hash: string;
+  path: string;
+  uploadedAt?: string;
 };
 
 export type DeviceData = {
