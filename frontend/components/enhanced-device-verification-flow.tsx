@@ -87,6 +87,7 @@ export function EnhancedDeviceVerificationFlow() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [isCheckingVerification, setCheckingVerification] = useState(true);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [failedSaveAttempts, setFailedSaveAttempts] = useState(0);
   const [hasShownFirstSaveToast, setHasShownFirstSaveToast] = useState(false);
@@ -126,13 +127,38 @@ export function EnhancedDeviceVerificationFlow() {
       }
 
       const data = await res.json();
-      console.log('🔍 Persona status response:', data);
+      console.log('Persona status response:', data);
       return data;
     } catch (error) {
       console.error('Error searching Persona inquiry:', error);
       return null;
     }
   };
+
+  useEffect(() => {
+    const wallet = localStorage.getItem('walletAddress') || localStorage.getItem('stellarPublicKey');
+    setLocalWalletAddress(wallet);
+
+    const checkPersonaVerification = async () => {
+      if (wallet) {
+        const result = await searchPersonaInquiry(wallet);
+        if (result && (result.status === 'completed')) {
+          setPersonaVerification(true);
+          setVerificationDone(true);
+          setCheckingVerification(false);
+        } else {
+
+          setVerificationDone(false);
+          setCheckingVerification(false);
+        }
+      } else {
+        setVerificationDone(false);
+        setCheckingVerification(false);
+      }
+    };
+
+    checkPersonaVerification();
+  }, []);
 
   const createPersonaInquiry = async () => {
     try {
@@ -242,13 +268,13 @@ export function EnhancedDeviceVerificationFlow() {
           pollRef.current = null;
           setPersonaVerification(true);
           setVerificationDone(true);
-          
+
           // Show success message
           toast({
             title: "Verification Complete!",
             description: "Your identity has been successfully verified. Redirecting to form...",
           });
-          
+
           // Redirect to form
           router.push('/form');
         } else {
@@ -270,33 +296,7 @@ export function EnhancedDeviceVerificationFlow() {
     };
   }, []);
 
-  // Initialize verification state and check Persona status
-  useEffect(() => {
-    setVerificationDone(false);
-    
-    // Get wallet address from localStorage
-    const wallet = localStorage.getItem('walletAddress') || localStorage.getItem('stellarPublicKey');
-    if (wallet) {
-      let addr = wallet;
-      try { 
-        addr = JSON.parse(wallet); 
-      } catch { 
-        // Keep original value if parsing fails
-      }
-      setLocalWalletAddress(addr as string);
-      console.log('🔍 Wallet address loaded:', addr);
-      
-      // Check if Persona verification is already completed
-      searchPersonaInquiry(addr as string).then((status) => {
-        if (status.status === 'completed' || status.status === 'approved') {
-          console.log('✅ Persona verification already completed, redirecting to form');
-          setPersonaVerification(true);
-          setVerificationDone(true);
-          router.push('/form');
-        }
-      });
-    }
-  }, [router]);
+
 
   // Cleanup Persona window on unmount
   useEffect(() => {
@@ -850,7 +850,7 @@ export function EnhancedDeviceVerificationFlow() {
       "5. Manufacturer: " + (deviceData.manufacturer || "Not provided"),
       "6. Model: " + (deviceData.model || "Not provided"),
       "7. Year of Manufacture: " +
-        (deviceData.yearOfManufacture || "Not provided"),
+      (deviceData.yearOfManufacture || "Not provided"),
       "8. Condition: " + (deviceData.condition || "Not provided"),
       "9. Specifications: " + (deviceData.specifications || "Not provided"),
       "\nSTEP 3: FINANCIAL INFORMATION",
@@ -858,18 +858,18 @@ export function EnhancedDeviceVerificationFlow() {
       "11. Current Value: " + (deviceData.currentValue || "Not provided"),
       "12. Expected Revenue: " + (deviceData.expectedRevenue || "Not provided"),
       "13. Operational Costs: " +
-        (deviceData.operationalCosts || "Not provided"),
+      (deviceData.operationalCosts || "Not provided"),
       "\nSTEP 4: DOCUMENTATION",
       "14. Technical Certification: " +
-        (deviceData.technicalCertification ? "Uploaded" : "Not uploaded"),
+      (deviceData.technicalCertification ? "Uploaded" : "Not uploaded"),
       "15. Purchase Proof: " +
-        (deviceData.purchaseProof ? "Uploaded" : "Not uploaded"),
+      (deviceData.purchaseProof ? "Uploaded" : "Not uploaded"),
       "16. Maintenance Records: " +
-        (deviceData.maintenanceRecords ? "Uploaded" : "Not uploaded"),
+      (deviceData.maintenanceRecords ? "Uploaded" : "Not uploaded"),
       "17. Device Images: " +
-        (deviceData.deviceImages.length > 0
-          ? `${deviceData.deviceImages.length} images uploaded`
-          : "No images uploaded"),
+      (deviceData.deviceImages.length > 0
+        ? `${deviceData.deviceImages.length} images uploaded`
+        : "No images uploaded"),
       "\n=== END OF FORM ===",
     ].join("\n");
 
@@ -952,25 +952,23 @@ export function EnhancedDeviceVerificationFlow() {
                 <div key={index} className="flex items-center">
                   <button
                     onClick={() => goToStep(index + 1)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 shadow-md ${
-                      index + 1 === currentStep
-                        ? "bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/20 scale-110 step-indicator-active"
-                        : index + 1 < currentStep
-                          ? "bg-primary/20 text-primary border-2 border-primary hover:bg-primary/30 hover:scale-105"
-                          : "bg-muted text-muted-foreground border-2 border-muted hover:bg-muted/80 hover:border-primary/50 hover:scale-105"
-                    }`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300 ease-in-out hover:scale-110 active:scale-95 shadow-md ${index + 1 === currentStep
+                      ? "bg-primary text-primary-foreground shadow-lg ring-2 ring-primary/20 scale-110 step-indicator-active"
+                      : index + 1 < currentStep
+                        ? "bg-primary/20 text-primary border-2 border-primary hover:bg-primary/30 hover:scale-105"
+                        : "bg-muted text-muted-foreground border-2 border-muted hover:bg-muted/80 hover:border-primary/50 hover:scale-105"
+                      }`}
                   >
                     {index + 1}
                   </button>
                   {index < totalSteps - 1 && (
                     <div
-                      className={`h-0.5 w-8 transition-all duration-400 ease-in-out rounded-full ${
-                        index + 1 < currentStep
-                          ? "bg-primary scale-x-100"
-                          : index + 1 === currentStep
-                            ? "bg-gradient-to-r from-primary to-muted scale-x-75"
-                            : "bg-muted scale-x-50"
-                      }`}
+                      className={`h-0.5 w-8 transition-all duration-400 ease-in-out rounded-full ${index + 1 < currentStep
+                        ? "bg-primary scale-x-100"
+                        : index + 1 === currentStep
+                          ? "bg-gradient-to-r from-primary to-muted scale-x-75"
+                          : "bg-muted scale-x-50"
+                        }`}
                     />
                   )}
                 </div>
@@ -995,7 +993,7 @@ export function EnhancedDeviceVerificationFlow() {
             key={`basic-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
+            onNext={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -1059,8 +1057,8 @@ export function EnhancedDeviceVerificationFlow() {
             key={`technical-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
-            onBack={() => {}}
+            onNext={() => { }}
+            onBack={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -1119,8 +1117,8 @@ export function EnhancedDeviceVerificationFlow() {
             key={`financial-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
-            onBack={() => {}}
+            onNext={() => { }}
+            onBack={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -1184,8 +1182,8 @@ export function EnhancedDeviceVerificationFlow() {
             key={`documentation-${currentDraftId || "new"}-${draftLoadKey}`}
             deviceData={deviceData}
             updateDeviceData={updateDeviceData}
-            onNext={() => {}}
-            onBack={() => {}}
+            onNext={() => { }}
+            onBack={() => { }}
             onSaveDraft={handleSaveDraft}
             onAutoSave={debouncedAutoSave}
           />
@@ -1262,6 +1260,14 @@ export function EnhancedDeviceVerificationFlow() {
     );
   }
 
+  if (isCheckingVerification) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh]">        
+        <p className="text-muted-foreground">Checking verification status...</p>
+      </div>
+    );
+  }
+
   if (isLoadingDraft) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -1308,7 +1314,7 @@ export function EnhancedDeviceVerificationFlow() {
                 onClick={handlePersonaVerification}
                 disabled={isVerifying || personaVerification}
               >
-                {isVerifying ? (
+                {isCheckingVerification ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Starting Verification...
@@ -1347,7 +1353,7 @@ export function EnhancedDeviceVerificationFlow() {
               >
                 Check my Status
               </Button>
-              
+
               {isVerifying && verificationWindowRef.current && (
                 <Button
                   className="bg-red-600 text-white w-full py-4 text-base font-semibold rounded-lg"

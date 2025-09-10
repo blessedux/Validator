@@ -46,12 +46,16 @@ export function DeviceBasicInfo({
   onSaveDraft,
   onAutoSave,
 }: DeviceBasicInfoProps) {
+  const [personaVerification, setPersonaVerification] = useState(false)
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showExplosion, setShowExplosion] = useState(false);
   const [explosionPosition, setExplosionPosition] = useState({ x: 0, y: 0 });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isSaving, setIsSaving] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<number | null>(null);
+  const verificationWindowRef = useRef<Window | null>(null);
+  const [localWalletAddress, setWalletAddress] = useState<any | null>(null);
   const { toast } = useToast();
 
   // Block Scroll while popup is open
@@ -70,6 +74,183 @@ export function DeviceBasicInfo({
   }, [showWelcomeModal]);
 
 
+  // WEBHOOK HANDLER --
+  // GET WEBHOOK PERSONA RESPONSE
+  async function handlePersonaWebhook(localWalletAddress: string) {
+    try {
+      const res = await fetch(`${backendSafeUrl}/webhook/persona/${encodeURIComponent(localWalletAddress)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('No inquiry found for referenceId:', localWalletAddress);
+          return null;
+        }
+        throw new Error(`Request failed: ${res.status}`);
+      }
+      return await res.json();
+    } catch (err) {
+      console.error('Error handling Persona webhook:', err);
+    }
+  }
+
+
+  // REPLACE WITH REAL BACKEND SAFE URL FUNCTION !!
+  const backendSafeUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000'
+  // CREATE INQUIRY --
+  // get wallet address from localStorage
+  useEffect(() => {
+    try {
+      const localDataInquiry = localStorage.getItem('walletAddress') || localStorage.getItem('stellarPublicKey');
+      if (localDataInquiry) {
+        let addr = localDataInquiry;
+        try { addr = JSON.parse(localDataInquiry); } catch { }
+        setWalletAddress(addr as string);
+        console.log('WALLET ADDRESS:', addr);
+      }
+    } catch (e) {
+      console.error('Error reading walletAddress from storage', e);
+    }
+  }, []);
+  // search inquiry by referenceId (wallet address) --
+  async function searchPersonaInquiry(localWalletAddress: string) {
+    try {
+      const res = await fetch(`${backendSafeUrl}/persona/inquiry/${encodeURIComponent(localWalletAddress)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        if (res.status === 404) {
+          console.warn('No inquiry found for referenceId:', localWalletAddress);
+          return null;
+        }
+        throw new Error(`Request failed: ${res.status}`);
+      }
+      return await res.json();
+    } catch (error) {
+      console.error('Error searching Persona inquiry:', error);
+      return null;
+    }
+  }
+
+  async function createPersonaInquiry() {
+    try {
+      const payload = { localWalletAddress };
+
+      const res = await fetch(`${backendSafeUrl}/persona/inquiry`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log('LOCAL PROFILE: ', localWalletAddress);
+      console.log('INQUIRY CREATED:', data);
+
+      const inquiryId = data?.result?.data?.id;
+      console.log('INQUIRY ID:', inquiryId);
+      if (!inquiryId) {
+        throw new Error('Inquiry ID missing in response');
+      }
+
+      // CREATE ONE-TIME-LINK --
+      const linkRes = await fetch(
+        `${backendSafeUrl}/persona/inquiry/${encodeURIComponent(inquiryId)}/generate-one-time-link`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!linkRes.ok) {
+        throw new Error(`Failed to generate one-time link: ${linkRes.status}`);
+      }
+
+      const linkData = await linkRes.json();
+      console.log('ONE-TIME LINK:', linkData);
+      return linkData.link || linkData.data?.attributes?.href || null;
+
+    } catch (error) {
+      console.error('ERROR CREATING INQUIRY OR LINK', error);
+      return null;
+    }
+  }
+
+  useEffect(() => {
+    (async () => {
+      if (!localWalletAddress) return
+      const existing = await searchPersonaInquiry(localWalletAddress)
+      if (existing?.status === 'completed') {
+        console.log('Persona verification already completed for this user.')
+        setPersonaVerification(true)
+      }
+    })()
+  }, [localWalletAddress])
+
+  const handlePersonaVerification = useCallback(async () => {
+    if (personaVerification) {
+      return
+    }
+
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+
+    if (!localWalletAddress) {
+      return console.error('Wallet address is required to create Persona inquiry', localStorage)
+    }
+
+    const oneTimeLink = await createPersonaInquiry()
+    if (!oneTimeLink) {
+      return console.error('Failed to create Persona inquiry or one-time link')
+    }
+
+    const personaWindow = window.open(oneTimeLink, "_blank");
+    verificationWindowRef.current = personaWindow;
+    setPersonaVerification(true)
+
+    console.log('STARTING PERSONA VERIFICATION FLOW ON:', oneTimeLink)
+    console.log('WAITING FOR PERSONA VERIFICATION TO COMPLETE...')
+
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const webhookResponse = await handlePersonaWebhook(localWalletAddress);
+        if (webhookResponse?.success) {
+          verificationWindowRef.current?.close();
+          verificationWindowRef.current = null;
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          setPersonaVerification(true);
+        } else {
+          console.log('Persona verification not completed yet.');
+        }
+      } catch (error) {
+        console.error('Error polling Persona webhook:', error);
+      }
+    }, 5000);
+  }, [localWalletAddress, personaVerification])
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
+  }, [])
+
   // Memoize device types to prevent re-creation on every render
   const DEVICE_TYPES = useMemo(() => [
     { value: "renewable-energy", label: "Renewable Energy" },
@@ -87,6 +268,7 @@ export function DeviceBasicInfo({
   const [localData, setLocalData] = useState({
     deviceName: deviceData.deviceName || "",
     deviceType: deviceData.deviceType || "",
+    customDeviceType: deviceData.customDeviceType || "",
     location: deviceData.location || ""
   })
 
@@ -123,6 +305,7 @@ export function DeviceBasicInfo({
     setLocalData({
       deviceName: deviceData.deviceName || "",
       deviceType: deviceData.deviceType || "",
+      customDeviceType: deviceData.customDeviceType || "",
       location: deviceData.location || ""
     })
   }, [deviceData.draftId]) // Only reset if draftId changes
@@ -225,7 +408,7 @@ export function DeviceBasicInfo({
 
   return (
     <>
-      {showWelcomeModal && (
+      {showWelcomeModal && !personaVerification && (
         <div ref={modalRef}>
           <Modal
             title="Device Verification"
@@ -237,12 +420,20 @@ export function DeviceBasicInfo({
                 We'll guide you through the process of verifying your device's technical and financial information. This
                 helps investors trust your pool and ensures transparency.
               </p>
+
+              {personaVerification && (
+                <div className="mt-4 flex items-center text-white">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <p>Waiting for Persona verification to complete...</p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end">
               <Button
                 className="bg-[#6366F1] text-white hover:bg-[#5355d1]"
-                onClick={handleCloseModal}
+                onClick={handlePersonaVerification}
+                disabled={personaVerification}
               >
                 Get Started
               </Button>

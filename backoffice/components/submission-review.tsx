@@ -102,6 +102,17 @@ export function SubmissionReview({
     Object.values(trufaScores).reduce((sum, score) => sum + score[0], 0) / 3,
   );
 
+  function checkReviewNotes(reviewerNotes: string) {
+    if (reviewerNotes.trim().length < 5) {
+      toast({
+        title: "Review Notes Required",
+        description: "Please provide detailed review notes before making a decision.",
+        variant: "destructive",
+      });
+      return true;
+    }
+  }
+
   // Fetch submission data
   useEffect(() => {
     const fetchSubmission = async () => {
@@ -127,17 +138,17 @@ export function SubmissionReview({
 
         setSubmission(submissionData);
         // Initialize TRUFA scores from existing admin review if available
-        if (submissionData.admin_review) {
-          const review = submissionData.admin_review;
+        if (submissionData.adminReview) {
+          const review = submissionData.adminReview;
           setTrufaScores({
-            technical: [review.technical_score || 75],
-            regulatory: [review.regulatory_score || 80],
-            financial: [review.financial_score || 70],
+            technical: [review.technicalScore || 75],
+            regulatory: [review.technicalScore || 80],
+            financial: [review.financialScore || 70],
           });
         }
         // Load existing admin notes
-        if (submissionData.admin_review?.notes) {
-          setReviewerNotes(submissionData.admin_review.notes);
+        if (submissionData.adminReview?.notes) {
+          setReviewerNotes(submissionData.adminReview.notes);
         }
       } catch (err) {
         const errorMessage =
@@ -285,6 +296,9 @@ export function SubmissionReview({
         throw new Error("Failed to update submission status in database");
       }
 
+      if (!isApproved) { return } // skip signing if rejected
+      // starts sign process --    
+
       // Create TRUFA metadata using production-ready service
       const metadata = stellarContractService.createTrufaMetadata({
         submissionId: submission.id,
@@ -337,12 +351,12 @@ export function SubmissionReview({
 
       // Create transaction signing function using the connected wallet
       const signTransaction = async (transactionXdr: string): Promise<string> => {
-        
+
         const signedXdr = await freighterService.signTransaction(transactionXdr, {
           networkPassphrase: 'Test SDF Network ; September 2015', // CHANGE IF USING MAINNET
           accountToSign: connectedWallet
         })
-      
+
         return signedXdr;
       };
 
@@ -372,7 +386,7 @@ export function SubmissionReview({
           submissionId: submission.id,
           decision: isApproved ? "APPROVED" : "REJECTED",
           trufaScore: averageScore,
-          metadataHash: metadata.metadataHash,
+          metadataHash: metadata.metadataHash, 
           transactionHash: contractResult.transactionHash,
           adminWallet: connectedWallet,
         });
@@ -384,6 +398,27 @@ export function SubmissionReview({
       } else {
         throw new Error(contractResult.error || "Contract submission failed");
       }
+
+      if (isSubmitted) {
+        try {
+          const reviewData = {
+            submissionId: submission.id,
+            notes: reviewerNotes,
+            technicalScore: trufaScores.technical[0],
+            regulatoryScore: trufaScores.regulatory[0],
+            financialScore: trufaScores.financial[0],
+            environmentalScore: 85,
+            overallScore: averageScore,
+            decision: isApproved ? 'APPROVED' as const : 'REJECTED' as const
+          };
+
+          const adminReview = await apiService.upsertAdminReview(reviewData);
+          console.log('Admin review saved:', adminReview);
+        } catch (error) {
+          console.error('Error saving admin review:', error);
+        }
+      }
+
     } catch (error) {
       toast({
         title: "Submission Error",
@@ -408,6 +443,8 @@ export function SubmissionReview({
     isApproved !== null &&
     !isSubmitted;
 
+  // ends sign process --
+
   return (
     <div className="min-h-screen bg-background">
       <Toaster />
@@ -425,7 +462,7 @@ export function SubmissionReview({
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold">
-                  {submission.device_name || "N/A"}
+                  {submission.deviceName || "N/A"}
                 </h1>
                 <Badge
                   className={
@@ -442,10 +479,10 @@ export function SubmissionReview({
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {submission.id} • Submitted by{" "}
-                {submission.user?.wallet_address
-                  ? `${submission.user.wallet_address.slice(0, 8)}...${submission.user.wallet_address.slice(-8)}`
+                {submission.user?.walletAddress
+                  ? `${submission.user.walletAddress.slice(0, 8)}...${submission.user.walletAddress.slice(-8)}`
                   : "Unknown"}{" "}
-                on {new Date(submission.submitted_at).toLocaleDateString()}
+                on {new Date(submission.submittedAt).toLocaleDateString()}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -483,7 +520,7 @@ export function SubmissionReview({
                       Device Type
                     </Label>
                     <p className="font-medium">
-                      {submission.device_type || "N/A"}
+                      {submission.deviceType || "N/A"}
                     </p>
                   </div>
                   <div>
@@ -505,7 +542,7 @@ export function SubmissionReview({
                       Serial Number
                     </Label>
                     <p className="font-medium">
-                      {submission.serial_number || "N/A"}
+                      {submission.serialNumber || "N/A"}
                     </p>
                   </div>
                   <div>
@@ -513,7 +550,7 @@ export function SubmissionReview({
                       Year of Manufacture
                     </Label>
                     <p className="font-medium">
-                      {submission.year_of_manufacture || "N/A"}
+                      {submission.yearOfManufacture || "N/A"}
                     </p>
                   </div>
                   <div>
@@ -556,8 +593,8 @@ export function SubmissionReview({
                     </Label>
                     <p className="font-medium">
                       $
-                      {submission.purchase_price
-                        ? Number(submission.purchase_price).toLocaleString()
+                      {submission.purchasePrice
+                        ? Number(submission.purchasePrice).toLocaleString()
                         : "N/A"}
                     </p>
                   </div>
@@ -567,8 +604,8 @@ export function SubmissionReview({
                     </Label>
                     <p className="font-medium">
                       $
-                      {submission.current_value
-                        ? Number(submission.current_value).toLocaleString()
+                      {submission.currentValue
+                        ? Number(submission.currentValue).toLocaleString()
                         : "N/A"}
                     </p>
                   </div>
@@ -578,8 +615,8 @@ export function SubmissionReview({
                     </Label>
                     <p className="font-medium">
                       $
-                      {submission.expected_revenue
-                        ? Number(submission.expected_revenue).toLocaleString()
+                      {submission.expectedRevenue
+                        ? Number(submission.expectedRevenue).toLocaleString()
                         : "N/A"}
                     </p>
                   </div>
@@ -589,8 +626,8 @@ export function SubmissionReview({
                     </Label>
                     <p className="font-medium">
                       $
-                      {submission.operational_costs
-                        ? Number(submission.operational_costs).toLocaleString()
+                      {submission.operationalCosts
+                        ? Number(submission.operationalCosts).toLocaleString()
                         : "N/A"}
                     </p>
                   </div>
@@ -736,7 +773,7 @@ export function SubmissionReview({
                   <Button
                     variant={isApproved === false ? "destructive" : "outline"}
                     size="lg"
-                    onClick={() => setIsApproved(false)}
+                    onClick={() => { checkReviewNotes(reviewerNotes) ?? setIsApproved(false) }}
                     className="flex-1"
                   >
                     <XCircle className="h-4 w-4 mr-2" />
@@ -745,7 +782,7 @@ export function SubmissionReview({
                   <Button
                     variant={isApproved === true ? "default" : "outline"}
                     size="lg"
-                    onClick={() => setIsApproved(true)}
+                    onClick={() => { checkReviewNotes(reviewerNotes) ?? setIsApproved(true) }}
                     className="flex-1"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
@@ -807,7 +844,11 @@ export function SubmissionReview({
                 </div>
 
                 <Button
-                  onClick={handleSignAndSubmit}
+                  onClick={() => {
+                    if (!checkReviewNotes(reviewerNotes)) {
+                      handleSignAndSubmit();
+                    }
+                  }}
                   disabled={!canSign}
                   className="w-full"
                   size="lg"
