@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminConfigService } from '@/lib/admin-config'
+import { apiService } from '@/lib/api-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,8 +37,9 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Signature length:', signature.length)
     console.log('🔍 Signature starts with AAAA:', signature.startsWith('AAAA'))
 
-    // Generate a JWT token (in production, use a proper JWT library)
-    const token = `admin_jwt_${Date.now()}_${Math.random().toString(36).substring(7)}`
+    // Authenticate with backend to get real JWT token
+    const backendAuth = await apiService.authenticateAdmin(walletAddress, signature)
+    const token = backendAuth.token
     const expiresIn = 3600 // 1 hour
     const expiresAt = Date.now() + (expiresIn * 1000)
 
