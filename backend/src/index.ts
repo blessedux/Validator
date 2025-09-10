@@ -6,7 +6,7 @@ import multer from 'multer'
 import path from 'path'
 import { TransactionBuilder, Networks } from 'stellar-sdk'
 import { prisma } from './lib/database'
-import { userService, profileService, submissionService, authService, adminReviewService, draftService } from './lib/database'
+import { userService, profileService, submissionService, authService, adminReviewService, draftService, personaValidationService } from './lib/database'
 import { env } from './lib/env-validation'
 import { handlePersonaWebhook, lastPersonaVerification } from './lib/personaWebhook'
 import { certificateService } from './lib/certificate-service'
@@ -15,6 +15,34 @@ const app = express();
 const PORT = env.PORT;
 const personaApiKey = env.PERSONA_API_KEY;
 const templateId = env.PERSONA_TEMPLATE_ID;
+
+// Admin wallet configuration (matching backoffice config)
+const ADMIN_WALLETS = [
+  "GAA5LJQ5ADNUBIHOIUXK6JIQ643KZGHBFPNCEYZ23LUK2U5JVLPSZOGZ",
+  "GCBA5O2JDZMG4TKBHAGWEQTMLTTHIPERZVQDQGGRYAIL3HAAJ3BAL3ZN",
+  "GDGYOBHJVNGVBCIHKDR7H6NNYRSPPK2TWANH6SIY34DJLSXUOJNXA2SN",
+  "GCLASRLEFVHLLYHIMTAC36E42OTZPKQDAL52AEKBVTIWNPVEC4GXMAFG",
+  "GC6GCTEW7Y4GA6DH7WM26NEKSW4RPI3ZVN6E3FLW3ZVNILKLV77I43BK",
+  "GCGZFA2PFQYHPGWCOL36J7DXQ3O3TFNIN24QAQ7J4BWQYH6OIGA7THOY",
+  "GDEMUCID6QUJFLKFAH37YYZEVRBOY5ZMOMCE4AGI5ALQQBFQJC24PRDP"
+];
+
+// Check if wallet is admin (MVP mode allows any wallet)
+async function checkAdminWallet(walletAddress: string): Promise<boolean> {
+  console.log(`🔍 Checking admin status for wallet: ${walletAddress}`);
+  
+  // MVP mode: allow any wallet
+  const isMVPMode = true; // Set to true for MVP phase
+  if (isMVPMode) {
+    console.log(`✅ MVP Mode: Treating wallet as admin: ${walletAddress.slice(0, 8)}...`);
+    return true;
+  }
+  
+  // Check against admin whitelist
+  const isAdmin = ADMIN_WALLETS.includes(walletAddress);
+  console.log(`🔍 Admin check result: ${isAdmin ? 'ADMIN' : 'NOT ADMIN'}`);
+  return isAdmin;
+}
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -331,6 +359,11 @@ app.use(
         "https://v.dobprotocol.com",
       ];
 
+      // Allow ngrok domains in development
+      if (process.env.NODE_ENV === "development" && origin.includes("ngrok-free.app")) {
+        return callback(null, true);
+      }
+
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
@@ -357,6 +390,7 @@ app.get("/health", (req, res) => {
 
 // Serve static files (profile images, uploads, etc.)
 // Serve static files from uploads directory
+
 app.use("/uploads", express.static(path.join(__dirname, "..", "..", "uploads")));
 
 // Ping endpoint for basic connectivity testing
@@ -442,8 +476,9 @@ app.post('/persona/inquiry', async (req, res) => {
       (req.body?.data?.attributes?.['reference-id'] as string) ||
       (req.body?.data?.attributes?.reference_id as string);
 
-    const referenceId =
-      referenceIdFromBody || (localProfile?.id as string) || walletAddress;
+    // Get or create user to use their ID as the reference ID
+    const user = await userService.findOrCreateByWallet(walletAddress);
+    const referenceId = user.id; // Using internal user ID as reference ID per Persona docs
 
 
     const payload = {
@@ -477,6 +512,90 @@ app.post('/persona/inquiry', async (req, res) => {
 
 
 app.post('/webhook/persona/', express.raw({ type: 'application/json' }), handlePersonaWebhook);
+
+// Get Persona validation status by wallet address
+app.get('/persona/inquiry/:walletAddress', async (req, res) => {
+  try {
+    const { walletAddress } = req.params;
+    console.log('🔍 Checking Persona validation status for wallet:', walletAddress);
+
+    // First get the user
+    const user = await userService.getByWallet(walletAddress);
+    if (!user) {
+      console.log('❌ User not found for wallet:', walletAddress);
+      return res.status(404).json({ error: 'No validation found' }); // Changed to match frontend expectation
+    }
+
+    // First check our local validation record
+    console.log('🔍 Checking local validation record for user:', user.id);
+    const localValidation = await prisma.personaValidation.findFirst({
+      where: {
+        referenceId: user.id,
+        status: {
+          in: ['completed', 'approved', 'passed']
+        }
+      },
+      orderBy: {
+        updatedAt: 'desc'
+      }
+    });
+
+    if (localValidation) {
+      console.log('✅ Found completed local validation:', localValidation);
+      return res.json({
+        status: localValidation.status,
+        inquiryId: localValidation.inquiryId,
+        updatedAt: localValidation.updatedAt
+      });
+    }
+
+    // If no local validation or not completed, check Persona API
+    console.log('🔍 No completed local validation found, checking Persona API...');
+    const url = `https://api.withpersona.com/api/v1/inquiries?filter%5Breference-id%5D=${encodeURIComponent(user.id)}&sort=-created-at&page%5Bsize%5D=1`;
+    console.log('🔍 Fetching from Persona API:', url);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${personaApiKey}`,
+        Accept: 'application/json',
+      },
+    });
+
+    const result = await response.json();
+    console.log('🔍 Persona API response:', result);
+
+    const dataArray = Array.isArray((result as any)?.data) ? (result as any).data : [];
+    if (dataArray.length === 0) {
+      console.log('❌ No inquiries found for user:', user.id);
+      return res.status(404).json({ error: 'No validation found' });
+    }
+
+    const status = dataArray[0]?.attributes?.status ?? null;
+    const inquiryId = dataArray[0]?.id ?? null;
+
+    // Update our local validation record
+    const validation = await personaValidationService.upsert(user.id, inquiryId, status);
+    console.log('✅ Updated local validation record:', validation);
+
+    // Check if the status is completed/approved/passed
+    if (['completed', 'approved', 'passed'].includes(validation.status)) {
+      console.log('✅ Validation is completed:', validation);
+      return res.json({ 
+        status: validation.status,
+        inquiryId: validation.inquiryId,
+        updatedAt: validation.updatedAt
+      });
+    }
+
+    // If not completed, return 404
+    console.log('❌ Validation not completed:', validation);
+    return res.status(404).json({ error: 'No completed validation found' });
+  } catch (error) {
+    console.error('❌ Error checking validation status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 app.get('/webhook/persona/:referenceId', (req, res) => {
   try {
@@ -1555,8 +1674,13 @@ app.put("/api/submissions/:id/status", async (req, res) => {
     const { walletAddress } = decoded;
 
     const user = await userService.getByWallet(walletAddress);
-    if (user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Admin access required" });
+    
+    // Check if user is admin either by database role or by admin config
+    const isAdminByRole = user?.role === "ADMIN";
+    const isAdminByConfig = await checkAdminWallet(walletAddress);
+    
+    if (!isAdminByRole && !isAdminByConfig) {
+      res.status(403).json({ error: "Admin access required: Only whitelisted admin wallets can sign Stellar transactions for project validation" });
       return;
     }
 
@@ -1593,8 +1717,13 @@ app.put("/api/submissions/:id", async (req, res) => {
     const { walletAddress } = decoded;
 
     const user = await userService.getByWallet(walletAddress);
-    if (user?.role !== "ADMIN") {
-      res.status(403).json({ error: "Admin access required" });
+    
+    // Check if user is admin either by database role or by admin config
+    const isAdminByRole = user?.role === "ADMIN";
+    const isAdminByConfig = await checkAdminWallet(walletAddress);
+    
+    if (!isAdminByRole && !isAdminByConfig) {
+      res.status(403).json({ error: "Admin access required: Only whitelisted admin wallets can sign Stellar transactions for project validation" });
       return;
     }
 

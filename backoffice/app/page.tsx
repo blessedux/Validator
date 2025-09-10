@@ -124,9 +124,9 @@ export default function LandingPage() {
       if (!adminConfigService.isAdminWallet(publicKey)) {
         console.log("❌ Non-admin wallet detected");
         toast({
-          title: "Access Denied",
+          title: "Admin Wallet Required",
           description:
-            "This wallet is not authorized for admin access. Please contact support if you believe this is an error.",
+            "You need an admin wallet to sign Stellar transactions for project validation. Only whitelisted admin wallets can access the backoffice and sign transactions on the Stellar network.",
           variant: "destructive",
         });
         return;
