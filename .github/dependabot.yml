@@ -1,37 +1,173 @@
 version: 2
 updates:
-  # Frontend dependencies
+  # Frontend regular updates
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
+          - "next*"
+        update-types:
+          - "minor"
+          - "patch"
+      ui-components:
+        patterns:
+          - "@radix-ui/*"
+          - "cmdk"
+          - "vaul"
+          - "react-resizable-panels"
+        update-types:
+          - "minor"
+          - "patch"
+      styling:
+        patterns:
+          - "tailwindcss*"
+          - "postcss*"
+          - "autoprefixer"
+          - "class-variance-authority"
+          - "tailwind-merge"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - "npm"
+      - "frontend"
+      - "dependencies"
+
+  # Frontend security updates
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
-    versioning-strategy: auto
     labels:
       - "npm"
-      - "dependencies"
+      - "frontend"
       - "security"
+    groups:
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
 
-  # Backend dependencies
+  # Backend regular updates
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    groups:
+      core:
+        patterns:
+          - "express*"
+          - "@types/express*"
+          - "dotenv"
+          - "cors"
+          - "helmet"
+        update-types:
+          - "minor"
+          - "patch"
+      tools:
+        patterns:
+          - "@typescript-eslint/*"
+          - "@types/*"
+          - "typescript"
+          - "eslint*"
+        update-types:
+          - "minor"
+          - "patch"
+      stellar:
+        patterns:
+          - "@stellar/*"
+          - "stellar-*"
+          - "soroban-*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - "npm"
+      - "backend"
+      - "dependencies"
+
+  # Backend security updates
   - package-ecosystem: "npm"
     directory: "/backend"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
-    versioning-strategy: auto
     labels:
       - "npm"
-      - "dependencies"
+      - "backend"
       - "security"
+    groups:
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
 
-  # Shared dependencies
+  # Shared regular updates
+  - package-ecosystem: "npm"
+    directory: "/shared"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    groups:
+      tools:
+        patterns:
+          - "@typescript-eslint/*"
+          - "@types/*"
+          - "typescript"
+          - "eslint*"
+        update-types:
+          - "minor"
+          - "patch"
+      dependencies:
+        patterns:
+          - "zod"
+          - "tsup"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - "npm"
+      - "shared"
+      - "dependencies"
+
+  # Shared security updates
   - package-ecosystem: "npm"
     directory: "/shared"
     schedule:
       interval: "daily"
-    open-pull-requests-limit: 10
-    versioning-strategy: auto
     labels:
       - "npm"
-      - "dependencies"
+      - "shared"
       - "security"
+    groups:
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
