@@ -5,12 +5,13 @@
       "prod": true,
       "develop": false,
       "staging": false,
-      "preview": false
+      "preview": false,
+      "*": false
     }
   },
-  "buildCommand": "cd ../.. && pnpm install && cd backoffice && pnpm build",
+  "buildCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"prod\" ]; then pnpm install && pnpm build; else echo '🚫 Build skipped: $VERCEL_GIT_COMMIT_REF is not prod branch' && exit 0; fi",
   "outputDirectory": ".next",
-  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"prod\" ]; then echo '🚫 Skipping deployment for non-production branch: $VERCEL_GIT_COMMIT_REF'; exit 1; fi",
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" != \"prod\" ]; then echo '🚫 Deployment skipped: $VERCEL_GIT_COMMIT_REF is not prod branch' && exit 0; fi",
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 30
