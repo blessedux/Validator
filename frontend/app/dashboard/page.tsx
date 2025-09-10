@@ -20,6 +20,8 @@ import { AuthGuard } from "@/components/auth-guard";
 import { useToast } from "@/hooks/use-toast";
 import { apiService } from "@/lib/api-service";
 
+import { SubmissionInfoPopup } from "@/components/ui/submissionInfoPopup";
+
 interface Submission {
   id: string;
   deviceName: string;
@@ -63,6 +65,36 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedRejection, setSelectedRejection] = useState<any>(null);
   const [selectedCertificate, setSelectedCertificate] = useState<any>(null);
+  const [viewReviewReason, setViewReviewReason] = useState<any>(false);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [popupStatus, setPopupStatus] = useState<string>("");
+  const [selectedItemStatus, setSelectedItemStatus] = useState<any>(null);
+
+  const handleReviewPopup = (id: string, status: string, items: any) => {
+    if (!viewReviewReason) {
+      setViewReviewReason(true);
+      setSelectedId(id);
+      setSelectedItemStatus(items); 
+      setPopupStatus("opened");
+
+      console.log("Review reason popup opened");
+      console.log("Item data:", items);
+    } else {
+      setViewReviewReason(false);
+      setPopupStatus("closed");
+      console.log("Review reason popup closed");
+    }
+  };
+
+  const handleClosePopup = () => {
+    setViewReviewReason(false);
+    setPopupStatus("closed");
+    setSelectedId("");
+    setSelectedItemStatus(null); 
+  };
+
+
+
   const [activeTab, setActiveTab] = useState<"submissions" | "drafts">(
     "submissions",
   );
@@ -254,9 +286,6 @@ export default function DashboardPage() {
     }
   };
 
-  const handleViewRejection = (device: any) => {
-    setSelectedRejection(device.rejectionData);
-  };
 
   const handleViewCertificate = (device: any) => {
     setSelectedCertificate(device.certificateData);
@@ -432,7 +461,6 @@ export default function DashboardPage() {
 
           <div className="flex justify-between items-center mb-8">
             <Button
-              onClick={fetchData}
               disabled={loading}
               variant="default"
               size="sm"
@@ -517,6 +545,8 @@ export default function DashboardPage() {
                     console.log("Is draft?", status === "draft");
 
                     return (
+                      <>
+
                       <tr key={`${status}-${item.id}`}>
                         <td className="px-6 py-4 whitespace-nowrap text-foreground font-medium">
                           {deviceName}
@@ -540,7 +570,7 @@ export default function DashboardPage() {
                               size="sm"
                               variant="outline"
                               className="gap-2"
-                              onClick={() => handleViewCertificate(item)}
+                                  onClick={() => handleReviewPopup(item.id, item.status, item)}
                             >
                               <Eye className="h-4 w-4" />
                               View Certificate
@@ -552,7 +582,7 @@ export default function DashboardPage() {
                               size="sm"
                               variant="destructive"
                               className="gap-2"
-                              onClick={() => handleViewRejection(item)}
+                                  onClick={() => handleReviewPopup(item.id, item.status, item)}
                             >
                               <AlertCircle className="h-4 w-4" />
                               Review Reason
@@ -574,6 +604,7 @@ export default function DashboardPage() {
                           )}
                         </td>
                       </tr>
+                      </>
                     );
                   })
                 )}
@@ -676,6 +707,12 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        <SubmissionInfoPopup
+          itemId={selectedId}
+          itemStatus={popupStatus}
+          items={selectedItemStatus}
+          onClose={handleClosePopup}
+        />
       </div>
 
       {/* Modals */}
@@ -695,5 +732,6 @@ export default function DashboardPage() {
         />
       )}
     </AuthGuard>
+
   );
 }

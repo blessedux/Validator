@@ -296,6 +296,9 @@ export function SubmissionReview({
         throw new Error("Failed to update submission status in database");
       }
 
+      if (!isApproved) { return } // skip signing if rejected
+      // starts sign process --    
+
       // Create TRUFA metadata using production-ready service
       const metadata = stellarContractService.createTrufaMetadata({
         submissionId: submission.id,
@@ -383,7 +386,7 @@ export function SubmissionReview({
           submissionId: submission.id,
           decision: isApproved ? "APPROVED" : "REJECTED",
           trufaScore: averageScore,
-          metadataHash: metadata.metadataHash,
+          metadataHash: metadata.metadataHash, 
           transactionHash: contractResult.transactionHash,
           adminWallet: connectedWallet,
         });
@@ -395,6 +398,27 @@ export function SubmissionReview({
       } else {
         throw new Error(contractResult.error || "Contract submission failed");
       }
+
+      if (isSubmitted) {
+        try {
+          const reviewData = {
+            submissionId: submission.id,
+            notes: reviewerNotes,
+            technicalScore: trufaScores.technical[0],
+            regulatoryScore: trufaScores.regulatory[0],
+            financialScore: trufaScores.financial[0],
+            environmentalScore: 85,
+            overallScore: averageScore,
+            decision: isApproved ? 'APPROVED' as const : 'REJECTED' as const
+          };
+
+          const adminReview = await apiService.upsertAdminReview(reviewData);
+          console.log('Admin review saved:', adminReview);
+        } catch (error) {
+          console.error('Error saving admin review:', error);
+        }
+      }
+
     } catch (error) {
       toast({
         title: "Submission Error",
@@ -418,6 +442,8 @@ export function SubmissionReview({
     isWalletWhitelisted &&
     isApproved !== null &&
     !isSubmitted;
+
+  // ends sign process --
 
   return (
     <div className="min-h-screen bg-background">
