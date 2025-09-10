@@ -379,9 +379,10 @@ export function DeviceReview({
                       "application/pdf" && (
                       <div className="mt-2">
                         <iframe
-                          src={URL.createObjectURL(
-                            deviceData.technicalCertification,
-                          )}
+                          src={deviceData.technicalCertification instanceof File 
+                            ? URL.createObjectURL(deviceData.technicalCertification)
+                            : `/api/files/${deviceData.technicalCertification.id}`
+                          }
                           className="w-full h-32 border border-gray-600 rounded"
                           title="Technical Certification Preview"
                         />
@@ -415,7 +416,10 @@ export function DeviceReview({
                     {deviceData.purchaseProof.type === "application/pdf" && (
                       <div className="mt-2">
                         <iframe
-                          src={URL.createObjectURL(deviceData.purchaseProof)}
+                          src={deviceData.purchaseProof instanceof File 
+                            ? URL.createObjectURL(deviceData.purchaseProof)
+                            : `/api/files/${deviceData.purchaseProof.id}`
+                          }
                           className="w-full h-32 border border-gray-600 rounded"
                           title="Purchase Proof Preview"
                         />
@@ -451,9 +455,10 @@ export function DeviceReview({
                       "application/pdf" && (
                       <div className="mt-2">
                         <iframe
-                          src={URL.createObjectURL(
-                            deviceData.maintenanceRecords,
-                          )}
+                          src={deviceData.maintenanceRecords instanceof File 
+                            ? URL.createObjectURL(deviceData.maintenanceRecords)
+                            : `/api/files/${deviceData.maintenanceRecords.id}`
+                          }
                           className="w-full h-32 border border-gray-600 rounded"
                           title="Maintenance Records Preview"
                         />
@@ -481,7 +486,7 @@ export function DeviceReview({
                       <div className="aspect-square bg-gray-700 rounded-lg overflow-hidden">
                         {file && file.type && file.type.startsWith("image/") ? (
                           <img
-                            src={URL.createObjectURL(file)}
+                            src={file instanceof File ? URL.createObjectURL(file) : `/api/files/${file.id}`}
                             alt={`Device Image ${index + 1}`}
                             className="w-full h-full object-cover"
                           />

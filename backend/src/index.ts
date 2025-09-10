@@ -123,8 +123,6 @@ app.post("/api/files/upload", upload.single("file"), async (req, res) => {
     console.error("File upload error:", error);
     res.status(500).json({ error: "Failed to upload file" });
   }
-  // Ensure all code paths return a value
-  return;
 });
 
 // File download/view endpoint for demo visualization

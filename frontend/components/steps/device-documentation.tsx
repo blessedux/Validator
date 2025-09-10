@@ -92,17 +92,22 @@ export function DeviceDocumentation({
       formData.append("file", file);
 
       try {
-        const res = await fetch(`http://localhost:3001/api/files/upload`, {
+        const res = await fetch(`/api/files/upload`, {
           method: "POST",
           body: formData,
         });
+        
+        console.log("🔍 Upload response status:", res.status);
+        console.log("🔍 Upload response headers:", res.headers);
+        
         const response = await res.json();
+        console.log("🔍 Upload response data:", response);
 
         if (response.status === "ok" && response.fileId) {
           const fileInfo: FileInfo = {
             id: response.fileId,
             name: response.filename,
-            type: response.type,
+            type: response.mimetype,
             mimetype: response.mimetype,
             size: response.size,
             hash: response.hash,
@@ -127,16 +132,18 @@ export function DeviceDocumentation({
             description: `${file.name} uploaded successfully`,
           });
         } else {
+          console.error("❌ Upload failed - invalid response:", response);
           toast({
             title: "Upload Failed",
-            description: "Could not upload file. Please try again.",
+            description: `Could not upload file. Response: ${JSON.stringify(response)}`,
             variant: "destructive",
           });
         }
       } catch (error) {
+        console.error("❌ Upload error:", error);
         toast({
           title: "Upload Error",
-          description: "Error uploading file. Please try again.",
+          description: `Error uploading file: ${error instanceof Error ? error.message : 'Unknown error'}`,
           variant: "destructive",
         });
       }
@@ -166,17 +173,20 @@ export function DeviceDocumentation({
         formData.append("file", file);
 
         try {
-          const res = await fetch(`http://localhost:3001/api/files/upload`, {
+          const res = await fetch(`/api/files/upload`, {
             method: "POST",
             body: formData,
           });
+          
+          console.log("🔍 Image upload response status:", res.status);
           const response = await res.json();
+          console.log("🔍 Image upload response data:", response);
 
           if (response.status === "ok" && response.fileId) {
             const fileInfo: FileInfo = {
               id: response.fileId,
               name: response.filename,
-              type: response.type,
+              type: response.mimetype,
               mimetype: response.mimetype,
               size: response.size,
               hash: response.hash,
@@ -184,16 +194,18 @@ export function DeviceDocumentation({
             };
             uploadedImages.push(fileInfo);
           } else {
+            console.error("❌ Image upload failed - invalid response:", response);
             toast({
               title: "Upload Failed",
-              description: `Could not upload image ${file.name}. Please try again.`,
+              description: `Could not upload image ${file.name}. Response: ${JSON.stringify(response)}`,
               variant: "destructive",
             });
           }
         } catch (error) {
+          console.error("❌ Image upload error:", error);
           toast({
             title: "Upload Error",
-            description: `Error uploading image ${file.name}. Please try again.`,
+            description: `Error uploading image ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
             variant: "destructive",
           });
         }
