@@ -25,7 +25,7 @@
     "demo": "ts-node scripts/demo-automation.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.10.1",
+    "@prisma/client": "^6.16.0",
     "@stellar/stellar-sdk": "^14.1.1",
     "@types/nodemailer": "^6.4.17",
     "@types/pdfkit": "^0.13.9",
@@ -57,7 +57,7 @@
     "@typescript-eslint/eslint-plugin": "^8.43.0",
     "@typescript-eslint/parser": "^8.43.0",
     "eslint": "^8.56.0",
-    "prisma": "^6.10.1",
+    "prisma": "^6.16.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.20.3",
