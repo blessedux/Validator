@@ -13,7 +13,7 @@ export interface AdminWallet {
 // In production, this would be stored in a database or environment variables
 export const ADMIN_WALLETS: AdminWallet[] = [
   {
-    address: "GAAKZ5PTQ7YLHTWQJQWEPAFOHEYFADEPB4DCBE4JWT63JCYJTCGULCAC",
+    address: "GAA5LJQ5ADNUBIHOIUXK6JIQ643KZGHBFPNCEYZ23LUK2U5JVLPSZOGZ",
     name: "Forecast",
     role: "SUPER_ADMIN",
     permissions: ["approve", "reject", "review", "manage_users", "view_stats"],
@@ -78,12 +78,16 @@ class AdminConfigService {
    *
    */
   isAdminWallet(walletAddress: string): boolean {
+    console.log(`🔍 Checking admin status for wallet: ${walletAddress}`);
+    console.log(`🔍 MVP Mode enabled: ${this.isMVPMode()}`);
+    
     // In MVP mode, treat any connected wallet as a VALIDATOR
     if (this.isMVPMode()) {
       logWithDOBArt(
         `MVP Mode: Treating wallet as VALIDATOR: ${walletAddress.slice(0, 8)}...`,
         "success",
       );
+      console.log(`✅ MVP Mode: Returning true for wallet: ${walletAddress.slice(0, 8)}...`);
       return true;
     }
 
@@ -110,6 +114,9 @@ class AdminConfigService {
    * Get admin wallet details
    */
   getAdminWallet(walletAddress: string): AdminWallet | null {
+    console.log(`🔍 Getting admin wallet for: ${walletAddress}`);
+    console.log(`🔍 MVP Mode enabled: ${this.isMVPMode()}`);
+    
     // In MVP mode, create a temporary admin profile for any wallet
     if (this.isMVPMode()) {
       const mvpAdmin: AdminWallet = {
@@ -124,6 +131,7 @@ class AdminConfigService {
         `MVP Mode: Created temporary admin profile for ${walletAddress.slice(0, 8)}...`,
         "info",
       );
+      console.log(`✅ MVP Mode: Returning admin profile for wallet: ${walletAddress.slice(0, 8)}...`);
       return mvpAdmin;
     }
 

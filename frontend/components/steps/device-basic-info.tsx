@@ -432,8 +432,7 @@ export function DeviceBasicInfo({
             <div className="flex justify-end">
               <Button
                 className="bg-[#6366F1] text-white hover:bg-[#5355d1]"
-                onClick={handlePersonaVerification}
-                disabled={personaVerification}
+                onClick={handleCloseModal}
               >
                 Get Started
               </Button>

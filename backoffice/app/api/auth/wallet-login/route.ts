@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const adminWallet = adminConfigService.getAdminWallet(walletAddress)
     if (!adminWallet) {
       return NextResponse.json(
-        { error: 'Unauthorized: Wallet is not an admin' },
+        { error: 'Admin wallet required: Only whitelisted admin wallets can sign Stellar transactions for project validation' },
         { status: 403 }
       )
     }
