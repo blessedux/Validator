@@ -1,3 +1,4 @@
+// CHECK IF THIS VERIFICATION IS NECESARY O JUST REMOVE IT
 // import crypto from 'crypto';
 
 
@@ -56,7 +57,7 @@ export const handlePersonaWebhook = async (req, res) => {
     // The referenceId from Persona is our internal user ID
     const { personaValidationService } = require('../lib/database');
     console.log('🔍 Upserting validation with referenceId (user.id):', referenceId);
-    
+
     // Update PersonaValidation record using our service with the user ID
     const result = await personaValidationService.upsert(referenceId, inquiryId, verificationStatus);
     console.log('✅ Updated PersonaValidation record:', result);
@@ -69,7 +70,7 @@ export const handlePersonaWebhook = async (req, res) => {
     };
 
     console.log('✅ Processed Persona webhook:', { verificationStatus, referenceId, inquiryId });
-    res.status(200).json({ 
+    res.status(200).json({
       status: verificationStatus,
       inquiryId: inquiryId,
       updatedAt: new Date()

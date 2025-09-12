@@ -30,14 +30,14 @@ const ADMIN_WALLETS = [
 // Check if wallet is admin (MVP mode allows any wallet)
 async function checkAdminWallet(walletAddress: string): Promise<boolean> {
   console.log(`🔍 Checking admin status for wallet: ${walletAddress}`);
-  
+
   // MVP mode: allow any wallet
   const isMVPMode = true; // Set to true for MVP phase
   if (isMVPMode) {
     console.log(`✅ MVP Mode: Treating wallet as admin: ${walletAddress.slice(0, 8)}...`);
     return true;
   }
-  
+
   // Check against admin whitelist
   const isAdmin = ADMIN_WALLETS.includes(walletAddress);
   console.log(`🔍 Admin check result: ${isAdmin ? 'ADMIN' : 'NOT ADMIN'}`);
@@ -157,34 +157,27 @@ async function verifyXDRTransaction(
   signedXDR: string,
   challenge: string,
 ): Promise<boolean> {
-  console.log("🔍 Verifying XDR transaction...");
-  console.log("🔍 Wallet address:", walletAddress);
-  console.log("🔍 Challenge:", challenge);
-  console.log("🔍 Signed XDR length:", signedXDR.length);
-
   try {
     // Parse the signed XDR transaction
     const transaction = TransactionBuilder.fromXDR(signedXDR, Networks.TESTNET);
-    console.log("✅ Transaction parsed successfully");
 
     // Handle different transaction types
     if ("source" in transaction) {
-      console.log("🔍 Transaction source:", transaction.source);
+      console.log("Transaction source:", transaction.source);
     } else {
-      console.log("🔍 Fee bump transaction - using inner transaction source");
+      console.log("Fee bump transaction - using inner transaction source");
       if (
         transaction.innerTransaction &&
         "source" in transaction.innerTransaction
       ) {
         console.log(
-          "🔍 Inner transaction source:",
+          "Inner transaction source:",
           transaction.innerTransaction.source,
         );
       }
     }
-
     console.log(
-      "🔍 Transaction operations count:",
+      "Transaction operations count:",
       transaction.operations.length,
     );
 
@@ -192,38 +185,36 @@ async function verifyXDRTransaction(
     let transactionChallenge = null;
     for (let i = 0; i < transaction.operations.length; i++) {
       const operation = transaction.operations[i];
-      console.log(`🔍 Operation ${i}:`, operation.type);
+      console.log(`Operation ${i}:`, operation.type);
 
       if (operation.type === "manageData") {
-        console.log("🔍 Found manageData operation");
+        console.log("Found manageData operation");
         const manageDataOp = operation as any; // Type assertion for manageData operation
-        console.log("🔍 Operation name:", manageDataOp.name);
-        console.log("🔍 Operation value:", manageDataOp.value);
+        console.log("Operation name:", manageDataOp.name);
+        console.log("Operation value:", manageDataOp.value);
 
         if (manageDataOp.name === "auth_challenge") {
           transactionChallenge = manageDataOp.value;
-          console.log("✅ Found auth_challenge data:", transactionChallenge);
+          console.log("Found auth_challenge data:", transactionChallenge);
           console.log(
-            "🔍 Transaction challenge type:",
+            "Transaction challenge type:",
             typeof transactionChallenge,
           );
           console.log(
-            "🔍 Transaction challenge length:",
+            "Transaction challenge length:",
             transactionChallenge ? String(transactionChallenge).length : 0,
           );
           console.log(
-            "🔍 Transaction challenge as string:",
+            "Transaction challenge as string:",
             String(transactionChallenge),
           );
           break;
         }
       }
     }
-
-
     if (!transactionChallenge) {
-      console.log("❌ No auth_challenge data found in transaction");
-      console.log("🔍 Available operations:");
+      console.log("No auth_challenge data found in transaction");
+      console.log("Available operations:");
       transaction.operations.forEach((op: any, i: number) => {
         console.log(`  ${i}: ${op.type} - ${op.name || "no name"}`);
       });
@@ -231,7 +222,7 @@ async function verifyXDRTransaction(
     }
 
     console.log(
-      "🔍 Transaction challenge (from manageData):",
+      "Transaction challenge (from manageData):",
       transactionChallenge,
     );
 
@@ -240,26 +231,16 @@ async function verifyXDRTransaction(
     const transactionChallengeStr = String(transactionChallenge);
     const storedChallengeStr = String(challenge);
 
-    console.log("🔍 Comparing challenges:");
-    console.log("🔍 Stored challenge (string):", storedChallengeStr);
-    console.log("🔍 Transaction challenge (string):", transactionChallengeStr);
-    console.log("🔍 Stored challenge length:", storedChallengeStr.length);
-    console.log(
-      "🔍 Transaction challenge length:",
-      transactionChallengeStr.length,
-    );
-
     if (!storedChallengeStr.startsWith(transactionChallengeStr)) {
-      console.log("❌ Challenge mismatch");
-      console.log("❌ Expected (stored):", storedChallengeStr);
-      console.log("❌ Received (transaction):", transactionChallengeStr);
+      console.log("Challenge mismatch");
+      console.log("Expected (stored):", storedChallengeStr);
+      console.log("Received (transaction):", transactionChallengeStr);
       console.log(
-        "❌ Stored starts with transaction?",
+        "Stored starts with transaction?",
         storedChallengeStr.startsWith(transactionChallengeStr),
       );
       return false;
     }
-
 
     // Verify the transaction signature
     let sourceAccount: string;
@@ -278,7 +259,6 @@ async function verifyXDRTransaction(
       }
     }
 
-
     if (sourceAccount !== walletAddress) {
       console.log("❌ Wallet address mismatch");
       console.log("❌ Expected:", walletAddress);
@@ -286,10 +266,10 @@ async function verifyXDRTransaction(
       return false;
     }
 
-    console.log("✅ XDR transaction verification successful");
+    console.log("XDR transaction verification successful");
     return true;
   } catch (error) {
-    console.error("❌ Error verifying XDR transaction:", error);
+    console.error("Error verifying XDR transaction:", error);
     return false;
   }
 }
@@ -441,7 +421,7 @@ app.post('/persona/inquiry/:inquiryId/generate-one-time-link', async (req, res) 
   }
 });
 
-// Persona inquiry creation 
+// Persona inquiry creation
 app.post('/persona/inquiry', async (req, res) => {
   try {
     if (!personaApiKey) {
@@ -515,12 +495,12 @@ app.post('/webhook/persona/', express.raw({ type: 'application/json' }), handleP
 app.get('/persona/inquiry/:walletAddress', async (req, res) => {
   try {
     const { walletAddress } = req.params;
-    console.log('🔍 Checking Persona validation status for wallet:', walletAddress);
+    console.log('Checking Persona validation status for wallet:', walletAddress);
 
     // First get the user
     const user = await userService.getByWallet(walletAddress);
     if (!user) {
-      console.log('❌ User not found for wallet:', walletAddress);
+      console.log('User not found for wallet:', walletAddress);
       return res.status(404).json({ error: 'No validation found' }); // Changed to match frontend expectation
     }
 
@@ -579,7 +559,7 @@ app.get('/persona/inquiry/:walletAddress', async (req, res) => {
     // Check if the status is completed/approved/passed
     if (['completed', 'approved', 'passed'].includes(validation.status)) {
       console.log('✅ Validation is completed:', validation);
-      return res.json({ 
+      return res.json({
         status: validation.status,
         inquiryId: validation.inquiryId,
         updatedAt: validation.updatedAt
@@ -678,7 +658,7 @@ app.get('/persona/inquiry/:referenceID', async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch inquiry' });
   }
 });
-
+// CHECK IF NEEDS TO REMOVE THIS
 // make status pending --> to development
 app.post('/persona/inquiry/:referenceID', async (req, res) => {
   try {
@@ -699,7 +679,7 @@ app.post('/persona/inquiry/:referenceID', async (req, res) => {
   }
 });
 
-// Create certificate 
+// Create certificate
 app.post("/certificate/generate/:submissionId/:stellarHash", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -724,8 +704,8 @@ app.post("/certificate/generate/:submissionId/:stellarHash", async (req, res) =>
     }
 
     console.log('Generating certificate for submission:', submissionId);
-    
-    const metadata = { submissionId, stellarTxHash }; 
+
+    const metadata = { submissionId, stellarTxHash };
 
     const result = await certificateService.generateAndSendCertificate({
       submissionId,
@@ -764,21 +744,21 @@ app.post("/certificate/generate/:submissionId/:stellarHash", async (req, res) =>
 // Database test endpoint
 app.get("/test-db", async (req, res) => {
   try {
-    console.log("🔍 Testing database connection...");
+    console.log("Testing database connection...");
 
     // Test user service
     const testUser = await userService.getByWallet(
       "GCBA5O2JDZMG4TKBHAGWEQTMLTTHIPERZVQDQGGRYAIL3HAAJ3BAL3ZN",
     );
     console.log(
-      "✅ User service test:",
+      "User service test:",
       testUser ? "User found" : "User not found",
     );
 
     // Test submission service
     const submissions = await submissionService.getAll({ limit: 1 });
     console.log(
-      "✅ Submission service test:",
+      "Submission service test:",
       submissions.submissions.length,
       "submissions found",
     );
@@ -847,12 +827,12 @@ app.post("/api/auth/verify", async (req, res) => {
 
     if (signature.startsWith("AAAA") && signature.length > 100) {
       // XDR transaction signature - use proper verification
-      console.log("🔍 Verifying XDR transaction signature...");
+      console.log("Verifying XDR transaction signature...");
       isValid = await verifyXDRTransaction(walletAddress, signature, challenge);
     } else {
       // Plain signature - for backward compatibility, accept any for now
       console.log(
-        "🔍 Plain signature detected, accepting for backward compatibility",
+        "Plain signature detected, accepting for backward compatibility",
       );
       isValid = true;
     }
@@ -880,7 +860,9 @@ app.post("/api/auth/verify", async (req, res) => {
 
     // Clean up challenge
     await authService.deleteChallenge(challenge);
-
+    // /api/auth/wallet-login DO THE SAME THING EXCEPT FOR THIS PART !!
+    // CHECK WHICH OF THEM ITS BEEN USED !!
+    //
     // Calculate expiresIn in seconds
     const expiresIn = env.JWT_EXPIRES_IN || "7d";
     const expiresInSeconds = expiresIn.includes("d")
@@ -960,7 +942,9 @@ app.post("/api/auth/wallet-login", async (req, res) => {
 
     // Clean up challenge
     await authService.deleteChallenge(challenge);
-
+    // /api/auth/verify DO THE SAME THING EXCEPT FOR THIS PART !!
+    // CHECK WHICH OF THEM ITS BEEN USED !!
+    //
     // Return in the format expected by the backoffice
     res.json({
       success: true,
@@ -991,16 +975,16 @@ app.get("/api/profile", async (req, res) => {
     const decoded = jwt.verify(token, env.JWT_SECRET);
     const { walletAddress } = decoded;
 
-    console.log("🔍 Looking for profile with wallet:", walletAddress);
+    console.log("Looking for profile with wallet:", walletAddress);
 
     const profile = await profileService.getByWallet(walletAddress);
     if (!profile) {
-      console.log("❌ Profile not found for wallet:", walletAddress);
+      console.log("Profile not found for wallet:", walletAddress);
       res.status(404).json({ error: "Profile not found" });
       return;
     }
 
-    console.log("✅ Profile found:", profile.id);
+    console.log("Profile found:", profile.id);
     res.json({ success: true, profile });
     return;
   } catch (error: any) {
@@ -1027,12 +1011,12 @@ app.get("/api/profile", async (req, res) => {
 
 app.post("/api/profile", async (req, res) => {
   try {
-    console.log("🔍 Profile POST request received");
-    console.log("🔍 Request body:", req.body);
+    console.log("Profile POST request received");
+    console.log("Request body:", req.body);
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("❌ No authorization header");
+      console.log("No authorization header");
       res.status(401).json({ error: "Authorization header required" });
       return;
     }
@@ -1040,26 +1024,26 @@ app.post("/api/profile", async (req, res) => {
     const token = authHeader.substring(7);
     const jwt = require("jsonwebtoken");
 
-    console.log("🔍 Verifying JWT token...");
+    console.log("Verifying JWT token...");
     const decoded = jwt.verify(token, env.JWT_SECRET);
     const { walletAddress } = decoded;
-    console.log("✅ JWT verified, wallet address:", walletAddress);
+    console.log("JWT verified, wallet address:", walletAddress);
 
     const { name, company, email, profileImage } = req.body;
-    console.log("🔍 Profile data:", { name, company, email, profileImage });
+    console.log("Profile data:", { name, company, email, profileImage });
 
     // Get user
-    console.log("🔍 Getting user by wallet...");
+    console.log("Getting user by wallet...");
     const user = await userService.getByWallet(walletAddress);
     if (!user) {
-      console.log("❌ User not found for wallet:", walletAddress);
+      console.log("User not found for wallet:", walletAddress);
       res.status(404).json({ error: "User not found" });
       return;
     }
-    console.log("✅ User found:", user.id);
+    console.log("User found:", user.id);
 
     // Create or update profile
-    console.log("🔍 Creating/updating profile...");
+    console.log("Creating/updating profile...");
     const profile = await profileService.create(user.id, {
       name,
       company,
@@ -1067,14 +1051,14 @@ app.post("/api/profile", async (req, res) => {
       walletAddress,
       profileImage,
     });
-    console.log("✅ Profile created/updated:", profile.id);
+    console.log("Profile created/updated:", profile.id);
 
     res.json({ success: true, profile });
     return;
   } catch (error) {
-    console.error("❌ Profile creation error:", error);
+    console.error("Profile creation error:", error);
     console.error(
-      "❌ Error stack:",
+      "Error stack:",
       error instanceof Error ? error.stack : "No stack trace",
     );
     res.status(500).json({ error: "Failed to create profile" });
@@ -1083,12 +1067,14 @@ app.post("/api/profile", async (req, res) => {
 });
 
 // Profile image upload endpoint
+// VERIFICATE UPLOAD --> ENCRYPT NAME AND HASH IMAGE, USE SAME PROCESS AS LOAD DOCUMENTS FOR SUBMISSION REVIEW
+// CHECK IF URL LOAD WORKS
 app.post(
   "/api/profile/upload-image",
   upload.single("profileImage"),
   async (req, res) => {
     try {
-      console.log("🔍 Profile image upload request received");
+      console.log("Profile image upload request received");
 
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -1159,7 +1145,7 @@ app.post(
       });
       return;
     } catch (error) {
-      console.error("❌ Profile image upload error:", error);
+      console.error("Profile image upload error:", error);
       res.status(500).json({ error: "Failed to upload profile image" });
       return;
     }
@@ -1169,11 +1155,11 @@ app.post(
 // Submissions endpoints
 app.get("/api/submissions", async (req, res) => {
   try {
-    console.log("🔍 Submissions request received");
+    console.log("Submissions request received");
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("❌ No authorization header");
+      console.log("No authorization header");
       res.status(401).json({ error: "Authorization header required" });
       return;
     }
@@ -1181,27 +1167,27 @@ app.get("/api/submissions", async (req, res) => {
     const token = authHeader.substring(7);
     const jwt = require("jsonwebtoken");
 
-    console.log("🔍 Verifying JWT token...");
+    console.log("Verifying JWT token...");
     const decoded = jwt.verify(token, env.JWT_SECRET);
     const { walletAddress } = decoded;
-    console.log("✅ JWT verified, wallet address:", walletAddress);
+    console.log("JWT verified, wallet address:", walletAddress);
 
     const { status, limit = 10, offset = 0 } = req.query;
 
     // Check if this is a backoffice request
     const isBackofficeRequest = req.headers["x-backoffice-request"] === "true";
-    console.log("🔍 Is backoffice request:", isBackofficeRequest);
+    console.log("Is backoffice request:", isBackofficeRequest);
 
     // Check if user is admin
-    console.log("🔍 Getting user by wallet...");
+    console.log("Getting user by wallet...");
     const user = await userService.getByWallet(walletAddress);
     const isAdmin = user?.role === "ADMIN";
-    console.log("✅ User found, isAdmin:", isAdmin, "role:", user?.role);
+    console.log("User found, isAdmin:", isAdmin, "role:", user?.role);
 
     let result;
     if (isAdmin && isBackofficeRequest) {
       // Admin in backoffice can see all submissions
-      console.log("🔍 Getting all submissions (admin in backoffice)...");
+      console.log("Getting all submissions (admin in backoffice)...");
       result = await submissionService.getAll({
         status: status as string,
         limit: parseInt(limit as string),
@@ -1209,7 +1195,7 @@ app.get("/api/submissions", async (req, res) => {
       });
     } else {
       // All users (including admins) in frontend can only see their own submissions
-      console.log("🔍 Getting user submissions...");
+      console.log("Getting user submissions...");
       result = await submissionService.getByUser(walletAddress, {
         status: status as string,
         limit: parseInt(limit as string),
@@ -1218,7 +1204,7 @@ app.get("/api/submissions", async (req, res) => {
     }
 
     console.log(
-      "✅ Submissions fetched successfully, count:",
+      "Submissions fetched successfully, count:",
       result.submissions?.length || 0,
     );
     res.json({ success: true, ...result });
@@ -1313,7 +1299,7 @@ app.get("/api/submissions/:id", async (req, res) => {
     return;
   }
 });
-
+// CHECK IF NEEDED TO REMOVE --> NEW IMPLEMENTATION -> ENDPOINT: /api/files/upload
 // File upload endpoint for individual files during form process
 app.post(
   "/api/upload-files",
@@ -1479,13 +1465,13 @@ app.post(
     }
   },
 );
-
+// CREATES NEW SUBMISSION --> NEW UPLOAD FILES ADDED -> CHECK IF ALL WORKS
 app.post("/api/submissions", upload.any(), async (req, res) => {
   try {
-    console.log("🔍 Submission POST request received");
-    console.log("🔍 Request headers:", req.headers);
-    console.log("🔍 Request body:", req.body);
-    console.log("🔍 Request files:", req.files);
+    console.log("Submission POST request received");
+    console.log("Request headers:", req.headers);
+    console.log("Request body:", req.body);
+    console.log("Request files:", req.files);
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -1616,8 +1602,8 @@ app.post("/api/submissions", upload.any(), async (req, res) => {
       });
     }
 
-    console.log("🔍 Processed submission data:", submissionData);
-    console.log("🔍 Processed files:", files);
+    console.log("Processed submission data:", submissionData);
+    console.log("Processed files:", files);
 
     const submission = await submissionService.create(user.id, {
       ...submissionData,
@@ -1627,17 +1613,17 @@ app.post("/api/submissions", upload.any(), async (req, res) => {
     res.json({ success: true, submission });
     return;
   } catch (error) {
-    console.error("❌ Submission creation error:", error);
+    console.error("Submission creation error:", error);
     console.error(
-      "❌ Error name:",
+      "Error name:",
       error instanceof Error ? error.name : "Unknown",
     );
     console.error(
-      "❌ Error message:",
+      "Error message:",
       error instanceof Error ? error.message : "No message",
     );
     console.error(
-      "❌ Error stack:",
+      "Error stack:",
       error instanceof Error ? error.stack : "No stack trace",
     );
 
@@ -1656,6 +1642,7 @@ app.post("/api/submissions", upload.any(), async (req, res) => {
   }
 });
 
+// CHECK IF THIS DO THE SAME AS /api/submissions/:id
 // Admin endpoints
 app.put("/api/submissions/:id/status", async (req, res) => {
   try {
@@ -1672,11 +1659,11 @@ app.put("/api/submissions/:id/status", async (req, res) => {
     const { walletAddress } = decoded;
 
     const user = await userService.getByWallet(walletAddress);
-    
+
     // Check if user is admin either by database role or by admin config
     const isAdminByRole = user?.role === "ADMIN";
     const isAdminByConfig = await checkAdminWallet(walletAddress);
-    
+
     if (!isAdminByRole && !isAdminByConfig) {
       res.status(403).json({ error: "Admin access required: Only whitelisted admin wallets can sign Stellar transactions for project validation" });
       return;
@@ -1700,6 +1687,7 @@ app.put("/api/submissions/:id/status", async (req, res) => {
 });
 
 // General submission update endpoint (admin only)
+// CHECK IF THIS DO THE SAME AS /api/submissions/:id/status
 app.put("/api/submissions/:id", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -1715,11 +1703,11 @@ app.put("/api/submissions/:id", async (req, res) => {
     const { walletAddress } = decoded;
 
     const user = await userService.getByWallet(walletAddress);
-    
+
     // Check if user is admin either by database role or by admin config
     const isAdminByRole = user?.role === "ADMIN";
     const isAdminByConfig = await checkAdminWallet(walletAddress);
-    
+
     if (!isAdminByRole && !isAdminByConfig) {
       res.status(403).json({ error: "Admin access required: Only whitelisted admin wallets can sign Stellar transactions for project validation" });
       return;
@@ -1787,7 +1775,7 @@ app.post("/api/admin-reviews", async (req, res) => {
       res.status(403).json({ error: "Admin access required" });
       return;
     }
-
+    // CHECK NAME CONVENTION
     const {
       submission_id,
       notes,
@@ -1922,6 +1910,8 @@ app.get("/api/drafts", async (req, res) => {
   }
 });
 
+
+// FILES UPLOAD CHANGED --> CHECK IF IT WORKS
 app.post(
   "/api/drafts",
   upload.fields([
@@ -1932,29 +1922,29 @@ app.post(
   ]),
   async (req, res) => {
     try {
-      console.log("🔍 Draft POST request received");
-      console.log("🔍 Request body:", req.body);
-      console.log("🔍 Request files:", req.files);
+      console.log("Draft POST request received");
+      console.log("Request body:", req.body);
+      console.log("Request files:", req.files);
 
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        console.log("❌ No authorization header");
+        console.log("No authorization header");
         res.status(401).json({ error: "Authorization header required" });
         return;
       }
 
       const token = authHeader.substring(7);
-      console.log("🔍 Token received:", token.substring(0, 20) + "...");
+      console.log("Token received:", token.substring(0, 20) + "...");
 
       const jwt = require("jsonwebtoken");
 
       const decoded = jwt.verify(token, env.JWT_SECRET);
-      console.log("🔍 JWT decoded:", decoded);
+      console.log("JWT decoded:", decoded);
       const { walletAddress } = decoded;
 
-      console.log("🔍 Looking for user with wallet:", walletAddress);
+      console.log("Looking for user with wallet:", walletAddress);
       const user = await userService.findOrCreateByWallet(walletAddress);
-      console.log("🔍 User found/created:", user.id);
+      console.log("User found/created:", user.id);
 
       // Extract form data
       const draftData = {
@@ -2037,20 +2027,20 @@ app.post(
         }
       }
 
-      console.log("🔍 Creating draft with data:", draftData);
-      console.log("🔍 Files to save:", files);
+      console.log("Creating draft with data:", draftData);
+      console.log("Files to save:", files);
 
       const draft = await draftService.create(user.id, {
         ...draftData,
         files: files.length > 0 ? files : undefined,
       });
 
-      console.log("🔍 Draft created successfully:", draft.id);
+      console.log("Draft created successfully:", draft.id);
       res.json({ success: true, draft });
       return;
     } catch (error: any) {
-      console.error("❌ Draft creation error:", error);
-      console.error("❌ Error stack:", error.stack);
+      console.error("Draft creation error:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ error: "Failed to create draft" });
       return;
     }
@@ -2106,9 +2096,9 @@ app.put(
   ]),
   async (req, res) => {
     try {
-      console.log("🔍 Draft PUT request received");
-      console.log("🔍 Request body:", req.body);
-      console.log("🔍 Request files:", req.files);
+      console.log("Draft PUT request received");
+      console.log("Request body:", req.body);
+      console.log("Request files:", req.files);
 
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -2219,8 +2209,8 @@ app.put(
         }
       }
 
-      console.log("🔍 Updating draft with data:", updateData);
-      console.log("🔍 Files to save:", files);
+      console.log("Updating draft with data:", updateData);
+      console.log("Files to save:", files);
 
       // Update the draft
       const updatedDraft = await draftService.update(id, {
@@ -2349,6 +2339,7 @@ app.get("/api/deployments/latest/:environment", async (req, res) => {
 });
 
 // Admin endpoints
+// CHECK THIS STILL NECESARY?
 app.get("/api/admin/profiles", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -2500,3 +2491,4 @@ process.on("SIGINT", async () => {
 });
 
 startServer(); // Force rebuild: Fri Jul  4 23:37:46 -04 2025 - F234C7A6-1C9B-4817-82F8-BA6B6BDC0612
+ // last endpoints check: fri/sept 12/2025 -> Mati (WIP)
