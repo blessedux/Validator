@@ -22,9 +22,29 @@ Use wallet address as input to create a challenge, this method provides a unique
 
 ### POSIBLE RESULTS
 
+## CORRECT REQUEST
 ```json
-(WIP)
+200 OK
+{
+    "success": true,
+    "challenge": "DOB_VALIDATOR_AUTH_<randomNumber>"
+}
 ```
+## NO WALLET ADDRESS
+```json
+400 BAD REQUEST
+{
+    "error": "Wallet address is required"
+}
+```
+## ERROR
+```json
+500 INTERNAL SERVER ERROR
+{
+    "error": "Failed to generate challenge"
+}
+```
+
 
 ## Authentication Verification
 
@@ -50,6 +70,44 @@ Uses wallet address, signature and challenge to verify user. To new users start 
 
 ### POSIBLE RESULTS
 
+## CORRECT REQUEST
 ```json
-(WIP)
+200 OK
+{
+    "success": true,
+    "token": "<jwtToken>",
+    "expiresIn": "<expireTimeInSeconds>",
+    "user": {
+        "id": "<id>",
+        "walletAddress": "<walletAddress>",
+        "email": "email",
+        "name": "name",
+        "company": "company",
+        "role": "<userRol>",
+        "createdAt": "<userCreationDate>",
+        "updatedAt": "<userCreationDateUpdate>",
+        "profile": "<profileRef>"
+    }
+}
+```
+## INVALID CHALLENGE
+```json
+401 UNAUTHORIZED
+{
+    "error": "Invalid or expired challenge"
+}
+```
+## INVALID SIGNATURE
+```json
+401 UNAUTHORIZED
+{
+    "error": "Invalid signature"
+}
+```
+## ERROR
+```json
+500 INTERNAL SERVER ERROR
+{
+    "error": "Failed to verify signature"
+}
 ```
