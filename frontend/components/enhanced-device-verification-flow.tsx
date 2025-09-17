@@ -11,9 +11,9 @@ import { useDraft } from "@/hooks/use-draft";
 import { Button } from "@/components/ui/button";
 import { Save, Loader2, Download, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-// import { animateScroll as scroll } from 'react-scroll'
+import { getAuthToken } from '@/lib/auth'
+import { getBackendUrl } from "@/lib/config-validation";
+import { set } from "date-fns";
 
 export type FileInfo = {
   id: string;
@@ -62,8 +62,8 @@ export function EnhancedDeviceVerificationFlow() {
 
   // Persona KYC integration states
   const [personaVerification, setPersonaVerification] = useState(false);
-  const [localWalletAddress, setLocalWalletAddress] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationUrl, setVerificationUrl] = useState<string | null>(null);
   const verificationWindowRef = useRef<Window | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -91,7 +91,6 @@ export function EnhancedDeviceVerificationFlow() {
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(false);
   const [isCheckingVerification, setCheckingVerification] = useState(true);
-  const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [failedSaveAttempts, setFailedSaveAttempts] = useState(0);
   const [hasShownFirstSaveToast, setHasShownFirstSaveToast] = useState(false);
   const [draftLoadKey, setDraftLoadKey] = useState(0);
@@ -110,234 +109,126 @@ export function EnhancedDeviceVerificationFlow() {
 
   // Persona KYC integration functions
   const getSafeBackendUrl = () => {
-    return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+    return process.env.NEXT_PUBLIC_BACKEND_URL;
   };
-
-  const searchPersonaInquiry = async (walletAddress: string) => {
+  //search persona inquiry  
+  const searchPersonaInquiry = async () => {
     try {
-      const backendUrl = getSafeBackendUrl();
-      const res = await fetch(`${backendUrl}/persona/inquiry/${encodeURIComponent(walletAddress)}`, {
+      const res = await fetch(`${getSafeBackendUrl()}/persona/inquiry`, {
         method: 'GET',
-        headers: { 
+        headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()?.token}`,
           'Origin': window.location.origin
         },
         credentials: 'include'
       });
-
       if (!res.ok) {
         if (res.status === 404) {
-          console.warn('No inquiry found for wallet:', walletAddress);
           return null;
         }
         throw new Error(`Request failed: ${res.status}`);
       }
-
       const data = await res.json();
-      console.log('Persona status response:', data);
       return data;
     } catch (error) {
-      console.error('Error searching Persona inquiry:', error);
       return null;
     }
   };
-
-  useEffect(() => {
-    const wallet = localStorage.getItem('walletAddress') || localStorage.getItem('stellarPublicKey');
-    setLocalWalletAddress(wallet);
-
-    const checkPersonaVerification = async () => {
-      if (wallet) {
-        const result = await searchPersonaInquiry(wallet);
-        if (result && (result.status === 'completed' || result.status === 'approved' || result.status === 'passed')) {
-          setPersonaVerification(true);
-          setVerificationDone(true);
-          setCheckingVerification(false);
-          // Store verification status in localStorage
-          localStorage.setItem('personaVerificationStatus', 'completed');
-        } else {
-          // Clear verification status from localStorage
-          localStorage.removeItem('personaVerificationStatus');
-          setVerificationDone(false);
-          setCheckingVerification(false);
-        }
-      } else {
-        // Clear verification status from localStorage
-        localStorage.removeItem('personaVerificationStatus');
-        setVerificationDone(false);
-        setCheckingVerification(false);
-      }
-    };
-
-    // Check localStorage first for quick response
-    const storedStatus = localStorage.getItem('personaVerificationStatus');
-    if (storedStatus === 'completed') {
-      setPersonaVerification(true);
-      setVerificationDone(true);
-      setCheckingVerification(false);
-    }
-
-    // Then verify with backend
-    checkPersonaVerification();
-  }, []);
-
+  //create new persona inquiry
   const createPersonaInquiry = async () => {
     try {
       const backendUrl = getSafeBackendUrl();
-      const payload = { localWalletAddress };
-
       const res = await fetch(`${backendUrl}/persona/inquiry`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()?.token}`,
           'Origin': window.location.origin
         },
-        credentials: 'include',
-        body: JSON.stringify(payload),
+        credentials: 'include'
       });
-
       if (!res.ok) {
         throw new Error(`Request failed: ${res.status}`);
       }
-
       const data = await res.json();
-      console.log('🔍 Inquiry created:', data);
+      const inquiryId = data?.inquiryId;
+      const oneTimeLink = data?.oneTimeLink;
 
-      const inquiryId = data?.result?.data?.id;
-      if (!inquiryId) {
-        throw new Error('Inquiry ID missing in response');
+      if (!inquiryId || !oneTimeLink) {
+        throw new Error('Error creating inquiry');
       }
-
-      // CREATE ONE-TIME-LINK
-      const linkRes = await fetch(
-        `${backendUrl}/persona/inquiry/${encodeURIComponent(inquiryId)}/generate-one-time-link`,
-        {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'Origin': window.location.origin
-          },
-          credentials: 'include'
-        }
-      );
-
-      if (!linkRes.ok) {
-        throw new Error(`Failed to generate one-time link: ${linkRes.status}`);
-      }
-
-      const linkData = await linkRes.json();
-      console.log('🔍 One-time link:', linkData);
-      return linkData.link || linkData.data?.attributes?.href || null;
-
+      return oneTimeLink;
     } catch (error) {
-      console.error('ERROR CREATING INQUIRY OR LINK', error);
       return null;
     }
   };
-
-  // WEBHOOK HANDLER - Simple implementation from mati-brach-dev
-  async function handlePersonaWebhook(walletAddress: string) {
+  //run on component mount
+  useEffect(() => {
+    const checkPersonaVerification = async () => {
+      const result = await searchPersonaInquiry();
+      if (result && (result.status === 'completed' || result.status === 'approved' || result.status === 'passed')) {
+        setPersonaVerification(true);
+        setVerificationDone(true);
+        setCheckingVerification(false);
+        setVerificationUrl(result?.oneTimeLink);
+      } else {
+        setVerificationDone(false);
+        setCheckingVerification(false);
+        setVerificationUrl(result?.oneTimeLink);
+      }
+    };
+    checkPersonaVerification();
+  }, []);
+  //calls persona api to check verification status
+  async function findInquiry() {
     try {
-      const res = await fetch(`${getSafeBackendUrl()}/persona/inquiry/${encodeURIComponent(walletAddress)}`, {
+      const res = await fetch(`${getSafeBackendUrl()}/persona/inquiry/inquiryID`, {
         method: 'GET',
-        headers: { 
+        headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()?.token}`,
           'Origin': window.location.origin
         },
         credentials: 'include'
       });
       if (!res.ok) {
         if (res.status === 404) {
-          console.warn('No inquiry found for wallet:', walletAddress);
           return null;
         }
         throw new Error(`Request failed: ${res.status}`);
       }
       return await res.json();
     } catch (err) {
-      console.error('Error handling Persona webhook:', err);
+      err.status(500).json({ error: "Can't verify thi session" });
+      return;
     }
   }
-
-  const handlePersonaVerification = useCallback(async () => {
+  //
+  const handlePersonaVerification = useCallback(async (verificationUrl: string) => {
     if (personaVerification) {
       return;
     }
-
     if (pollRef.current) {
       clearInterval(pollRef.current);
       pollRef.current = null;
     }
-
-    if (!localWalletAddress) {
-      return console.error('Wallet address is required to create Persona inquiry', localStorage);
+    //check if there is a verification url already       
+    if (!verificationUrl) {
+      await createPersonaInquiry();
+      const response = await findInquiry();
+      setVerificationUrl(response.data.oneTimeLink);
     }
-
-    const oneTimeLink = await createPersonaInquiry();
-    if (!oneTimeLink) {
-      return console.error('Failed to create Persona inquiry or one-time link');
-    }
-
-    const personaWindow = window.open(oneTimeLink, "_blank");
-    verificationWindowRef.current = personaWindow;
+    //NEEDS TO ENCRYPT BACKEND URL HERE !!!    
+    verificationUrl = verificationUrl + `&redirect-uri=${getSafeBackendUrl()}/persona-callback?token=${getAuthToken()?.token}`;
+    router.push(verificationUrl);
     setIsVerifying(true);
+  }, [personaVerification]);
 
-    console.log('STARTING PERSONA VERIFICATION FLOW ON:', oneTimeLink);
-    console.log('WAITING FOR PERSONA VERIFICATION TO COMPLETE...');
-
-    pollRef.current = window.setInterval(async () => {
-      try {
-        const webhookResponse = await handlePersonaWebhook(localWalletAddress);
-        if (webhookResponse?.status === 'completed' || webhookResponse?.status === 'approved' || webhookResponse?.status === 'passed') {
-          verificationWindowRef.current?.close();
-          verificationWindowRef.current = null;
-          clearInterval(pollRef.current!);
-          pollRef.current = null;
-          setPersonaVerification(true);
-          setVerificationDone(true);
-
-          // Show success message
-          toast({
-            title: "Verification Complete!",
-            description: "Your identity has been successfully verified. Redirecting to form...",
-          });
-
-          // Redirect to form
-          router.push('/form');
-        } else {
-          console.log('Persona verification not completed yet.');
-        }
-      } catch (error) {
-        console.error('Error polling Persona webhook:', error);
-      }
-    }, 5000);
-  }, [localWalletAddress, personaVerification, router]);
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, []);
-
-
-
-  // Cleanup Persona window on unmount
-  useEffect(() => {
-    return () => {
-      if (verificationWindowRef.current) {
-        verificationWindowRef.current.close();
-      }
-    };
-  }, []);
-
+  //end of persona kyc ---
   // Check for edit mode and load draft if needed
   useEffect(() => {
     const editId = searchParams?.get("edit");
@@ -920,13 +811,7 @@ export function EnhancedDeviceVerificationFlow() {
     });
   };
 
-  const handleSubmissionSuccess = () => {
-    setSubmissionSuccess(true);
-    // Redirect to dashboard after a short delay to show the new submission
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 2000); // 2 second delay to show success message
-  };
+
 
   const handleNewProject = () => {
     // Clear all localStorage backups
@@ -966,7 +851,6 @@ export function EnhancedDeviceVerificationFlow() {
 
     // Reset to step 1
     setCurrentStep(1);
-    setSubmissionSuccess(false);
 
     // Navigate to form
     router.push("/form");
@@ -1293,7 +1177,7 @@ export function EnhancedDeviceVerificationFlow() {
 
   if (isCheckingVerification) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[40vh]">        
+      <div className="flex flex-col items-center justify-center min-h-[40vh]">
         <p className="text-muted-foreground">Checking verification status...</p>
       </div>
     );
@@ -1342,7 +1226,7 @@ export function EnhancedDeviceVerificationFlow() {
               <Button
                 className="bg-primary text-primary-foreground hover:bg-primary/90 w-full py-4 text-base font-semibold rounded-lg"
                 style={{ minWidth: 0 }}
-                onClick={handlePersonaVerification}
+                onClick={() => handlePersonaVerification(verificationUrl)}
                 disabled={isVerifying || personaVerification}
               >
                 {isCheckingVerification ? (
@@ -1361,25 +1245,22 @@ export function EnhancedDeviceVerificationFlow() {
                 style={{ minWidth: 0 }}
                 variant="outline"
                 onClick={() => {
-                  // Check current status using simple webhook approach
-                  if (localWalletAddress) {
-                    handlePersonaWebhook(localWalletAddress).then((webhookResponse) => {
-                      if (webhookResponse?.status === 'completed' || webhookResponse?.status === 'approved' || webhookResponse?.status === 'passed') {
-                        toast({
-                          title: "Verification Complete",
-                          description: "Your identity verification is already complete.",
-                        });
-                        setPersonaVerification(true);
-                        setVerificationDone(true);
-                        router.push('/form');
-                      } else {
-                        toast({
-                          title: "Verification Pending",
-                          description: `Your identity verification is still in progress. Status: ${webhookResponse?.status || 'unknown'}`,
-                        });
-                      }
-                    });
-                  }
+                  findInquiry().then((inquiryFinded) => {
+                    if (inquiryFinded?.status === 'completed' || inquiryFinded?.status === 'approved' || inquiryFinded?.status === 'passed') {
+                      toast({
+                        title: "Verification Complete",
+                        description: "Your identity verification is already complete.",
+                      });
+                      setPersonaVerification(true);
+                      setVerificationDone(true);
+                      router.push('/form');
+                    } else {
+                      toast({
+                        title: "Verification Pending",
+                        description: `Your identity verification is still in progress. Status: ${inquiryFinded?.status || 'unknown'}`,
+                      });
+                    }
+                  });
                 }}
               >
                 Check my Status
