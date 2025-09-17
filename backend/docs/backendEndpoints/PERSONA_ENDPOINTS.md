@@ -2,6 +2,8 @@
 
 DOB Validator uses the Persona API to improve account security. This documentation shows relevant information about the implementation, such as its endpoints and development TODOs.
 
+** *Endpoints test WIP* **
+
 ## Persona endpoints
 
 ## API/PERSONA/
@@ -9,7 +11,7 @@ DOB Validator uses the Persona API to improve account security. This documentati
 ## CREATE INQUIRY
 
 ### DESCRIPTION
-Creates a Persona Inquiry using the configured template and optional prefilled fields.
+Creates a Persona Inquiry using the configured template and optional prefilled fields. Also creates a temporary link to start verification. This link is saved in db at the start and deleted at the end.
 
 ### ENDPOINT
 `/persona/inquiry`
@@ -67,60 +69,10 @@ Creates a Persona Inquiry using the configured template and optional prefilled f
     "error": "Failed to upload file"
 }
 ```
-## GENERATE ONE-TIME LINK
-
-### DESCRIPTION
-Generates a one-time link for an existing Persona Inquiry.
-
-### ENDPOINT
-`/persona/inquiry/:inquiryId/generate-one-time-link`
-
-### METHOD
-
-`POST`
-
-### (JSON) PARAMETERS
-
-| Parameter   | Type   | Requerided | Description        |
-| ----------- | ------ | ---------- | ------------------ |
-| `inquiryId` | string | yes        | Persona Inquiry ID |
-
-### POSIBLE RESULTS
-
-## ONE-TIME LINK NOT GENERATED
-```json
-200 OK
-{
-    "link": "<oneTimeLink>"
-}
-```
-## ONE-TIME LINK NOT GENERATED
-```json
-400 BAD REQUEST
-{
-    "error": "One-time link not found in Persona response"
-}
-```
-## BAD BEARER TOKEN
-```json
-401 UNAUTHORIZED
-{
-    "error": "Authorization header required"
-}
-```
-
-## ERROR 
-```json
-500 INTERNAL SERVER ERROR
-{
-    "error": "Failed to generate one-time link"
-}
-```
-
 ## GET INQUIRY
 
 ### DESCRIPTION
-Gets the latest inquiry by referenceID and updates its status in DB.
+Gets the latest inquiry by referenceID and updates the status in DB. Also checks one-time-link and update it.
 
 ### ENDPOINT
 `/persona/inquiry`
@@ -221,13 +173,13 @@ NONE
    "error": "Webhook processing failed"
 }
 ```
-## Webhook To Redirect User
+## Check Inquiry Status
 
 ### DESCRIPTION
-This endpoint uses **Webhook Receiver** endpoint to get the status of the inquiry and redirect the user to the appropriate page when persona verification is completed.
+This endpoint its used to find an inquiry by user encoded id. Its used to check inquiry status.
 
 ### ENDPOINT
-`/webhook/persona/:referenceId`
+`/persona/inquiry/inquiryID`
 
 ### (JSON) PARAMETERS
 
@@ -265,3 +217,16 @@ This endpoint uses **Webhook Receiver** endpoint to get the status of the inquir
    "error": "Failed to filter webhooks"
 }
 ```
+## Redirect Endpoint
+
+### DESCRIPTION
+This endpoint its used to redirect the user after verificate with persona. This method its recommended by persona [here](https://docs.withpersona.com/hosted-flow-redirecting-on-complete).
+This method keeps user in one tab and make validation process flow better.
+ 
+### ENDPOINT
+`/persona-callback`
+
+### (JSON) PARAMETERS
+NONE
+### POSIBLE RESULTS
+(WIP)
