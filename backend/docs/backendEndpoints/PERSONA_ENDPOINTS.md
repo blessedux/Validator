@@ -48,6 +48,27 @@ Creates a Persona Inquiry using the configured template and optional prefilled f
     "referenceId": "<userId>"
 }
 ```
+## ERROR CREATING LINK TO START VERIFICATION
+```json
+400 BAD REQUEST
+{
+    "error": "Error trying to create one-time-link"
+}
+```
+## ERROR UPDATING INQUIRY ON DB
+```json
+400 BAD REQUEST
+{
+    "error": "Error trying to update inquiry in DB"
+}
+```
+## ERROR WITH PERSONA API KEY
+```json
+400 BAD REQUEST
+{
+    "error": "Error with persona api key"
+}
+```
 ## BAD BEARER TOKEN
 ```json
 401 UNAUTHORIZED
@@ -66,7 +87,7 @@ Creates a Persona Inquiry using the configured template and optional prefilled f
 ```json
 500 INTERNAL SERVER ERROR
 {
-    "error": "Failed to upload file"
+    "error": "Failed to create inquiry on persona"
 }
 ```
 ## GET INQUIRY
@@ -92,15 +113,15 @@ Gets the latest inquiry by referenceID and updates the status in DB. Also checks
 ```json
 200 OK
 {
-  "status": "completed",
+  "status": "<inquiryStatus>",
   "updatedRows": 1
 }
 ```
-## BAD BEARER TOKEN
+## ERROR CREATING LINK TO START VERIFICATION
 ```json
 400 BAD REQUEST
 {
-    "error": "Error with persona api key"
+    "error": "Error trying to create one-time-link"
 }
 ```
 ## BAD BEARER TOKEN
@@ -110,19 +131,25 @@ Gets the latest inquiry by referenceID and updates the status in DB. Also checks
     "error": "Authorization header required"
 }
 ```
-## USER NOT FOUND
+## CAN'T FIND USER
 ```json
 404 NOT FOUND
 {
-    "error": "User not found"
+    "error": "No user found"
 }
 ```
-## INQUIRY NOT FOUND
+## CAN'T FIND VALIDATIONS ON PERSONA
 ```json
 404 NOT FOUND
 {
-    "error": "No inquiries found for referenceID",
-    "referenceID": "<referenceId>"
+    "error": "No validation found"
+}
+```
+## CAN'T FIND VALIDATIONS ON PERSONA
+```json
+404 NOT FOUND
+{
+    "error": "No completed validation found"
 }
 ```
 ## ERROR 
@@ -130,47 +157,6 @@ Gets the latest inquiry by referenceID and updates the status in DB. Also checks
 500 INTERNAL SERVER ERROR
 {
     "error": "Failed to generate one-time link"
-}
-```
-
-## Webhook Receiver
-
-### DESCRIPTION
-Webhook configured on persona API, receives status of inquiry and process it with handlePersonaWebhook function.
-### ENDPOINT
-`/webhook/persona/`
-
-### METHOD
-
-`POST`
-
-### (JSON) PARAMETERS
-
-NONE
-
-### POSIBLE RESULTS
-
-## WEBHOOK RECEIVED
-```json
-200 OK
-{
-    "status": "<newStatus>",
-    "inquiryId": "<inquiryId>",
-    "updatedAt": "<updatedDate>"
-}
-```
-## WEBHOOK CANT FIND DATA
-```json
-404 NOT FOUND
-{
-    "error": "Missing required webhook data"
-}
-```
-## ERROR
-```json
-500 INTERNAL SERVER ERROR
-{
-   "error": "Webhook processing failed"
 }
 ```
 ## Check Inquiry Status
@@ -189,11 +175,19 @@ This endpoint its used to find an inquiry by user encoded id. Its used to check 
 
 ### POSIBLE RESULTS
 
-## WEBHOOK RECEIVED
+## INQUIRY RECEIVED
 ```json
 200 OK
 {
     "success": true,
+    "<data>"
+}
+```
+## ERROR TRYING TO UPDATE STATUS IN DB
+```json
+400 BAD REQUEST
+{
+    "error": "<inquiryStatus>, <dbUpdateError>"
 }
 ```
 ## BAD BEARED TOKEN
@@ -203,18 +197,18 @@ This endpoint its used to find an inquiry by user encoded id. Its used to check 
     "error": "Authorization header required"
 }
 ```
-## NOT FOUND ANY WEBHOOK
+## NOT FOUND ANY INQUIRY
 ```json
 404 NOT FOUND
 {
-    "error": "No completed webhooks found for this referenceId: <referenceId>"
+    "error": "No completed inquiry found for this referenceId: <referenceId>"
 }
 ```
 ## ERROR
 ```json
 500 INTERNAL SERVER ERROR
 {
-   "error": "Failed to filter webhooks"
+   "error": "Failed to filter inquiries"
 }
 ```
 ## Redirect Endpoint
@@ -229,4 +223,53 @@ This method keeps user in one tab and make validation process flow better.
 ### (JSON) PARAMETERS
 NONE
 ### POSIBLE RESULTS
-(WIP)
+## INQUIRY RECEIVED
+```json
+200 OK
+{
+    "success": true,
+    "<data>"
+}
+```
+## ERROR WITH PERSONA API KEY
+```json
+400 BAD REQUEST
+{
+    "error": "Error with persona api key"
+}
+```
+## ERROR TRYING TO UPDATE STATUS IN DB
+```json
+400 BAD REQUEST
+{
+    "error": "<inquiryStatus>, <dbUpdateError>"
+}
+```
+## TOKEN NOT INCLUIDED 
+```json
+403 NOT AUTHORIZED
+{
+    "error": "Can't access"
+}
+```
+## CAN'T FIND USER
+```json
+404 NOT FOUND
+{
+    "error": "User not found"
+}
+```
+## CAN'T FIND INQUIRIES
+```json
+404 NOT FOUND
+{
+    "error": "No inquiries found for referenceID, <referenceId>"
+}
+```
+## ERROR
+```json
+500 INTERNAL SERVER ERROR
+{
+   "error": "Failed to filter inquiries"
+}
+```
