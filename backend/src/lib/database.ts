@@ -649,7 +649,8 @@ export const personaValidationService = {
           referenceId: userId,
           status,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          oneTimeLink: 'not_generated_yet'
         }
       });
     } catch (error) {

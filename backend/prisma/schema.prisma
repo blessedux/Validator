@@ -32,6 +32,7 @@ model PersonaValidation {
   inquiryId   String   @unique
   referenceId String   // This is the user ID
   status      String
+  oneTimeLink String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [referenceId], references: [id], onDelete: Cascade)
